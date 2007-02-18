@@ -1,0 +1,19 @@
+Store callbacks in $^H to have a lexical pragma
+
+Make match vars work
+
+Change perl internals to allow match vars to be arbitary SV*? Can only
+be offsets into a string now, Perhaps cheat and pack SV* into two
+I32*?
+
+    I32 *startp;            /* Array of offsets from start of string (@-) */
+	I32 *endp;              /* Array of offsets from start of string (@+) */
+
+That requires changes 
+    
+
+allow comp and exec callbacks not to be specified
+
+bless into the package that import gets called with
+
+Make move eval.t files when the rest of the callbacks are implemented

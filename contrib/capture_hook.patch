@@ -1,0 +1,303 @@
+﻿Index: D:/dev/perl/ver/zoro/embed.h
+===================================================================
+--- D:/dev/perl/ver/zoro/embed.h	(revision 972)
++++ D:/dev/perl/ver/zoro/embed.h	(revision 973)
+@@ -698,6 +698,8 @@
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_named_buff_get	Perl_reg_named_buff_get
+ #define reg_numbered_buff_get	Perl_reg_numbered_buff_get
++#endif
++#if defined(PERL_CORE) || defined(PERL_EXT)
+ #define regprop			Perl_regprop
+ #endif
+ #define repeatcpy		Perl_repeatcpy
+@@ -2915,7 +2917,9 @@
+ #define regnext(a)		Perl_regnext(aTHX_ a)
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_named_buff_get(a,b,c)	Perl_reg_named_buff_get(aTHX_ a,b,c)
+-#define reg_numbered_buff_get(a,b,c,d)	Perl_reg_numbered_buff_get(aTHX_ a,b,c,d)
++#define reg_numbered_buff_get(a,b,c)	Perl_reg_numbered_buff_get(aTHX_ a,b,c)
++#endif
++#if defined(PERL_CORE) || defined(PERL_EXT)
+ #define regprop(a,b,c)		Perl_regprop(aTHX_ a,b,c)
+ #endif
+ #define repeatcpy(a,b,c,d)	Perl_repeatcpy(aTHX_ a,b,c,d)
+Index: D:/dev/perl/ver/zoro/regcomp.c
+===================================================================
+--- D:/dev/perl/ver/zoro/regcomp.c	(revision 972)
++++ D:/dev/perl/ver/zoro/regcomp.c	(revision 973)
+@@ -4692,58 +4692,53 @@
+     return(r);
+ }
+ 
+-#undef CORE_ONLY_BLOCK
+ #undef RE_ENGINE_PTR
+ 
+-#ifndef PERL_IN_XSUB_RE
++
+ SV*
+-Perl_reg_named_buff_get(pTHX_ SV* namesv, const REGEXP * const from_re, U32 flags)
++Perl_reg_named_buff_get(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags)
+ {
+     AV *retarray = NULL;
+     SV *ret;
+     if (flags & 1) 
+         retarray=newAV();
+-    
+-    if (from_re || PL_curpm) {
+-        const REGEXP * const rx = from_re ? from_re : PM_GETRE(PL_curpm);
+-        if (rx && rx->paren_names) {            
+-            HE *he_str = hv_fetch_ent( rx->paren_names, namesv, 0, 0 );
+-            if (he_str) {
+-                IV i;
+-                SV* sv_dat=HeVAL(he_str);
+-                I32 *nums=(I32*)SvPVX(sv_dat);
+-                for ( i=0; i<SvIVX(sv_dat); i++ ) {
+-                    if ((I32)(rx->nparens) >= nums[i]
+-                        && rx->startp[nums[i]] != -1
+-                        && rx->endp[nums[i]] != -1)
+-                    {
+-                        ret = reg_numbered_buff_get(nums[i],rx,NULL,0);
+-                        if (!retarray) 
+-                            return ret;
+-                    } else {
+-                        ret = newSVsv(&PL_sv_undef);
+-                    }
+-                    if (retarray) {
+-                        SvREFCNT_inc(ret); 
+-                        av_push(retarray, ret);
+-                    }
++        
++    if (rx && rx->paren_names) {            
++        HE *he_str = hv_fetch_ent( rx->paren_names, namesv, 0, 0 );
++        if (he_str) {
++            IV i;
++            SV* sv_dat=HeVAL(he_str);
++            I32 *nums=(I32*)SvPVX(sv_dat);
++            for ( i=0; i<SvIVX(sv_dat); i++ ) {
++                if ((I32)(rx->nparens) >= nums[i]
++                    && rx->startp[nums[i]] != -1
++                    && rx->endp[nums[i]] != -1)
++                {
++                    ret = CALLREG_NUMBUF(rx,nums[i],NULL);
++                    if (!retarray) 
++                        return ret;
++                } else {
++                    ret = newSVsv(&PL_sv_undef);
+                 }
+-                if (retarray)
+-                    return (SV*)retarray;
++                if (retarray) {
++                    SvREFCNT_inc(ret); 
++                    av_push(retarray, ret);
++                }
+             }
++            if (retarray)
++                return (SV*)retarray;
+         }
+     }
+     return NULL;
+ }
+ 
+ SV*
+-Perl_reg_numbered_buff_get(pTHX_ I32 paren, const REGEXP * const rx, SV* usesv, U32 flags)
++Perl_reg_numbered_buff_get(pTHX_ const REGEXP * const rx, I32 paren, SV* usesv)
+ {
+     char *s = NULL;
+     I32 i = 0;
+     I32 s1, t1;
+     SV *sv = usesv ? usesv : newSVpvs("");
+-    PERL_UNUSED_ARG(flags);
+         
+     if (!rx->subbeg) {
+         sv_setsv(sv,&PL_sv_undef);
+@@ -4812,8 +4807,8 @@
+     }
+     return sv;
+ }
+-#endif
+ 
++
+ /* Scans the name of a named buffer from the pattern.
+  * If flags is REG_RSN_RETURN_NULL returns null.
+  * If flags is REG_RSN_RETURN_NAME returns an SV* containing the name
+Index: D:/dev/perl/ver/zoro/regcomp.h
+===================================================================
+--- D:/dev/perl/ver/zoro/regcomp.h	(revision 972)
++++ D:/dev/perl/ver/zoro/regcomp.h	(revision 973)
+@@ -463,6 +463,8 @@
+         Perl_re_intuit_start,
+         Perl_re_intuit_string, 
+         Perl_regfree_internal, 
++        Perl_reg_numbered_buff_get,
++        Perl_reg_named_buff_get,
+ #if defined(USE_ITHREADS)        
+         Perl_regdupe_internal
+ #endif        
+Index: D:/dev/perl/ver/zoro/regexp.h
+===================================================================
+--- D:/dev/perl/ver/zoro/regexp.h	(revision 972)
++++ D:/dev/perl/ver/zoro/regexp.h	(revision 973)
+@@ -111,6 +111,8 @@
+ 			    struct re_scream_pos_data_s *data);
+     SV*	    (*checkstr) (pTHX_ regexp *prog);
+     void    (*free) (pTHX_ struct regexp* r);
++    SV*     (*numbered_buff_get) (pTHX_ const REGEXP * const rx, I32 paren, SV* usesv);
++    SV*     (*named_buff_get)(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags);
+ #ifdef USE_ITHREADS
+     void* (*dupe) (pTHX_ const regexp *r, CLONE_PARAMS *param);
+ #endif    
+Index: D:/dev/perl/ver/zoro/perl.h
+===================================================================
+--- D:/dev/perl/ver/zoro/perl.h	(revision 972)
++++ D:/dev/perl/ver/zoro/perl.h	(revision 973)
+@@ -219,6 +219,13 @@
+ #define CALLREGFREE_PVT(prog) \
+     if(prog) CALL_FPTR((prog)->engine->free)(aTHX_ (prog))
+ 
++#define CALLREG_NUMBUF(rx,paren,usesv) \
++    CALL_FPTR((rx)->engine->numbered_buff_get)(aTHX_ (rx),(paren),(usesv))
++
++#define CALLREG_NAMEDBUF(rx,name,flags) \
++    CALL_FPTR((rx)->engine->named_buff_get)(aTHX_ (rx),(name),(flags))
++
++        
+ #if defined(USE_ITHREADS)         
+ #define CALLREGDUPE(prog,param) \
+     Perl_re_dup(aTHX_ (prog),(param))
+Index: D:/dev/perl/ver/zoro/proto.h
+===================================================================
+--- D:/dev/perl/ver/zoro/proto.h	(revision 972)
++++ D:/dev/perl/ver/zoro/proto.h	(revision 973)
+@@ -1888,12 +1888,15 @@
+ 			__attribute__warn_unused_result__
+ 			__attribute__nonnull__(pTHX_1);
+ 
+-PERL_CALLCONV SV*	Perl_reg_named_buff_get(pTHX_ SV* namesv, const REGEXP * const from_re, U32 flags)
+-			__attribute__nonnull__(pTHX_1);
+ 
+-PERL_CALLCONV SV*	Perl_reg_numbered_buff_get(pTHX_ I32 paren, const REGEXP * const rx, SV* usesv, U32 flags)
++PERL_CALLCONV SV*	Perl_reg_named_buff_get(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags)
++			__attribute__nonnull__(pTHX_1)
+ 			__attribute__nonnull__(pTHX_2);
+ 
++PERL_CALLCONV SV*	Perl_reg_numbered_buff_get(pTHX_ const REGEXP * const rx, I32 paren, SV* usesv)
++			__attribute__nonnull__(pTHX_1);
++
++
+ PERL_CALLCONV void	Perl_regprop(pTHX_ const regexp *prog, SV* sv, const regnode* o)
+ 			__attribute__nonnull__(pTHX_2)
+ 			__attribute__nonnull__(pTHX_3);
+Index: D:/dev/perl/ver/zoro/ext/re/re.xs
+===================================================================
+--- D:/dev/perl/ver/zoro/ext/re/re.xs	(revision 972)
++++ D:/dev/perl/ver/zoro/ext/re/re.xs	(revision 973)
+@@ -22,6 +22,8 @@
+ extern SV*	my_re_intuit_string (pTHX_ regexp *prog);
+ 
+ extern void	my_regfree (pTHX_ struct regexp* r);
++extern SV*      my_reg_numbered_buff_get(pTHX_ const REGEXP * const rx, I32 paren, SV* usesv);
++extern SV*      my_reg_named_buff_get(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags);
+ #if defined(USE_ITHREADS)
+ extern void*	my_regdupe (pTHX_ const regexp *r, CLONE_PARAMS *param);
+ #endif
+@@ -36,6 +38,8 @@
+         my_re_intuit_start, 
+         my_re_intuit_string, 
+         my_regfree, 
++        my_reg_numbered_buff_get,
++        my_reg_named_buff_get,
+ #if defined(USE_ITHREADS)
+         my_regdupe 
+ #endif
+@@ -213,7 +217,7 @@
+ {
+     re = get_re_arg( aTHX_ qr, 1, NULL);
+     if (SvPOK(sv) && re && re->paren_names) {
+-        bufs = Perl_reg_named_buff_get(aTHX_ sv, re ,all && SvTRUE(all));
++        bufs = CALLREG_NAMEDBUF(re,sv,all && SvTRUE(all));
+         if (bufs) {
+             if (all && SvTRUE(all))
+                 XPUSHs(newRV(bufs));
+Index: D:/dev/perl/ver/zoro/ext/re/re_top.h
+===================================================================
+--- D:/dev/perl/ver/zoro/ext/re/re_top.h	(revision 972)
++++ D:/dev/perl/ver/zoro/ext/re/re_top.h	(revision 973)
+@@ -16,6 +16,8 @@
+ #define Perl_regfree_internal   my_regfree
+ #define Perl_re_intuit_string   my_re_intuit_string
+ #define Perl_regdupe_internal   my_regdupe
++#define Perl_reg_numbered_buff_get  my_reg_numbered_buff_get
++#define Perl_reg_named_buff_get  my_reg_named_buff_get
+ 
+ #define PERL_NO_GET_CONTEXT
+ 
+Index: D:/dev/perl/ver/zoro/mg.c
+===================================================================
+--- D:/dev/perl/ver/zoro/mg.c	(revision 972)
++++ D:/dev/perl/ver/zoro/mg.c	(revision 973)
+@@ -863,7 +863,7 @@
+ 		 * XXX Does the new way break anything?
+ 		 */
+ 		paren = atoi(mg->mg_ptr); /* $& is in [0] */
+-		reg_numbered_buff_get( paren, rx, sv, 0);
++		CALLREG_NUMBUF(rx,paren,sv);
+ 		break;
+ 	    }
+ 	    sv_setsv(sv,&PL_sv_undef);
+@@ -872,7 +872,7 @@
+     case '+':
+ 	if (PL_curpm && (rx = PM_GETRE(PL_curpm))) {
+ 	    if (rx->lastparen) {
+-	        reg_numbered_buff_get( rx->lastparen, rx, sv, 0);
++	        CALLREG_NUMBUF(rx,rx->lastparen,sv);
+ 	        break;
+ 	    }
+ 	}
+@@ -881,7 +881,7 @@
+     case '\016':		/* ^N */
+ 	if (PL_curpm && (rx = PM_GETRE(PL_curpm))) {
+ 	    if (rx->lastcloseparen) {
+-	        reg_numbered_buff_get( rx->lastcloseparen, rx, sv, 0);
++	        CALLREG_NUMBUF(rx,rx->lastcloseparen,sv);
+ 	        break;
+ 	    }
+ 
+@@ -891,16 +891,16 @@
+     case '`':
+       do_prematch_fetch:
+ 	if (PL_curpm && (rx = PM_GETRE(PL_curpm))) {
+-	  reg_numbered_buff_get( -2, rx, sv, 0);
+-	  break;
++	    CALLREG_NUMBUF(rx,-2,sv);
++	    break;
+ 	}
+ 	sv_setsv(sv,&PL_sv_undef);
+ 	break;
+     case '\'':
+       do_postmatch_fetch:
+ 	if (PL_curpm && (rx = PM_GETRE(PL_curpm))) {
+-	  reg_numbered_buff_get( -1, rx, sv, 0);
+-	  break;
++	    CALLREG_NUMBUF(rx,-1,sv);
++	    break;
+ 	}
+ 	sv_setsv(sv,&PL_sv_undef);
+ 	break;
+Index: D:/dev/perl/ver/zoro/embed.fnc
+===================================================================
+--- D:/dev/perl/ver/zoro/embed.fnc	(revision 972)
++++ D:/dev/perl/ver/zoro/embed.fnc	(revision 973)
+@@ -691,8 +691,10 @@
+ 				|NN char* strend|NN char* strbeg|I32 minend \
+ 				|NN SV* screamer|NULLOK void* data|U32 flags
+ ApR	|regnode*|regnext	|NN regnode* p
+-EXp	|SV*|reg_named_buff_get	|NN SV* namesv|NULLOK const REGEXP * const from_re|U32 flags
+-EXp	|SV*|reg_numbered_buff_get|I32 paren|NN const REGEXP * const rx|NULLOK SV* usesv|U32 flags
++
++EXp	|SV*|reg_named_buff_get	|NN const REGEXP * const rx|NN SV* namesv|U32 flags
++EXp	|SV*|reg_numbered_buff_get|NN const REGEXP * const rx|I32 paren|NULLOK SV* usesv
++
+ Ep	|void	|regprop	|NULLOK const regexp *prog|NN SV* sv|NN const regnode* o
+ Ap	|void	|repeatcpy	|NN char* to|NN const char* from|I32 len|I32 count
+ ApP	|char*	|rninstr	|NN const char* big|NN const char* bigend \

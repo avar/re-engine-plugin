@@ -1,0 +1,208 @@
+=head1 NAME
+
+re::engine::Plugin - Pure-Perl regular expression engine plugin interface
+
+=head1 SYNOPSIS
+
+    use feature ':5.10';
+    use re::engine::Plugin (
+        comp => sub {
+            my ($re) = @_; # A re::engine::Plugin object
+
+            # return value ignored
+        },
+        exec => sub {
+            my ($re, $str) = @_;
+
+           # We always like ponies!
+           return 1 if $str eq 'pony';
+           return;
+        }
+    );
+
+    "pony" =~ /yummie/;
+
+=head1 DESCRIPTION
+
+As of perl 5.9.5 it's possible lexically replace perl's built-in
+regular expression engine (see L<perlreguts|perlreguts/"Pluggable
+Interface">). This module provides glue for writing such a wrapper in
+Perl instead of the provided C/XS interface.
+
+B<NOTE>: This module is a development release that does not work with
+any version of perl other than the current (as of February 2007)
+I<blead>. The provided interface is not a complete wrapper around the
+native interface (yet!) but the parts that are left can be implemented
+with additional methods so the completed API shouldn't have any major
+changes.
+
+=head1 METHODS
+
+=head2 import
+
+Takes a list of key-value pairs with the only mandatory pair being
+L</exec> and its callback routine. Both subroutine references and the
+string name of a subroutine (e.g. C<"main::exec">) can be
+specified. The real CODE ref is currently looked up in the symbol
+table in the latter case.
+
+=over 4
+
+=item comp
+
+An optional sub to be called when a pattern is being compiled, note
+that a single pattern may be compiled more than once by perl.
+
+The subroutine will be called with a regexp object (see L</Regexp
+object>). The regexp object will be stored internally along with the
+pattern and provided as the first argument for the other callback
+routines (think of it as C<$self>).
+
+If your regex implementation needs to validate its pattern this is the
+right place to B<croak> on an invalid one (but see L</BUGS>).
+
+The return value of this subroutine is discarded.
+
+=item exec
+
+Called when a given pattern is being executed, the first argument is
+the regexp object and the second is the string being matched. The
+routine should return true if the pattern matched and false if it
+didn't.
+
+=item intuit
+
+TODO: implement
+
+=item checkstr
+
+TODO: implement
+
+=item free
+
+TODO: implement
+
+=item dupe
+
+TODO: implement
+
+=item numbered_buff_get
+
+TODO: implement
+
+=item named_buff_get
+
+TODO: implement
+
+=back
+
+=head2 flags
+
+L<perlop/"/PATTERN/cgimosx">
+
+=head1 TODO
+
+=over
+
+=item *
+
+Provide an API for named (C<$+{name}>) and unnamed (C<$1, $2, ...>)
+match variables, allow specifying both offsets into the pattern and
+any given scalar.
+
+=item *
+
+Find some neat example for the L</SYNOPSIS>, suggestions welcome.
+
+=back
+
+=head1 BUGS
+
+Please report any bugs that aren't already listed at
+L<http://rt.cpan.org/Dist/Display.html?Queue=re-engine-Plugin> to
+L<http://rt.cpan.org/Public/Bug/Report.html?Queue=re-engine-Plugin>
+
+=over 1
+
+=item
+
+Calling C<die> or anything that uses it (such as C<carp>) in the
+L</comp> callback routines will not be trapped by an C<eval> block
+that the pattern is in, i.e.
+
+   use Carp qw(croak);
+   use re::engine::Plugin(
+       comp => sub {
+           my $re = shift;
+           croak "Your pattern is invalid"
+               unless $re->pattern =~ /pony/;
+       }
+   );
+
+   # Ignores the eval block
+   eval { /you die in C<eval>, you die for real/ };
+
+Simply put this happens because the real subroutine call happens
+indirectly and not in the scope of the C<eval> block. 
+
+=back
+
+=head1 Regexp object
+
+The regexp object is passed around as the first argument to all the
+callback routines, it supports the following method calls (with more
+to come!).
+
+=over
+
+=item pattern
+
+Returns the pattern this regexp was compiled with.
+
+=item flags
+
+Returns a string of flags the pattern was compiled
+with. (e.g. C<"xs">). The flags are not guarenteed to be in any
+particular order, so don't depend on the current one.
+
+=item stash
+
+Returns or sets a user-defined stash that's passed around with the
+pattern, this is useful for passing around an arbitary scalar between
+callback routines, example:
+
+    use re::engine::Plugin (
+        comp => sub { $_[0]->stash( [ 1 .. 5 ] ) },
+        comp => sub { $_[0]->stash }, # Get [ 1 .. 5]
+    );
+
+=item minlen
+
+The minimum length a given string must be to match the pattern, set
+this to an integer in B<comp> and perl will not call your B<exec>
+routine unless the string being matched as at least that long. Returns
+the currently set length if not called with any arguments or C<undef>
+if no length has been set.
+
+=back
+
+=head1 SEE ALSO
+
+L<perlreguts/Pluggable Interface>
+
+=head1 THANKS
+
+Yves explaining why I made the regexp engine a sad panda.
+
+=head1 AUTHOR
+
+E<AElig>var ArnfjE<ouml>rE<eth> Bjarmason <avar@cpan.org>
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+Copyright 2007 E<AElig>var ArnfjE<ouml>rE<eth> Bjarmason.
+
+=cut
