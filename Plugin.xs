@@ -126,32 +126,36 @@ Plugin_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
     SV * callback = get_H_callback("exec");
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
-    /* Store the current str for ->str */
-    self->str = (SV*)sv;
-    SvREFCNT_inc(self->str);
+    if (callback) {
+        /* Store the current str for ->str */
+        self->str = (SV*)sv;
+        SvREFCNT_inc(self->str);
 
-    ENTER;
-    SAVETMPS;
+        ENTER;
+        SAVETMPS;
    
-    PUSHMARK(SP);
-    XPUSHs(rx->pprivate);
-    XPUSHs(sv);
-    PUTBACK;
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv);
+        PUTBACK;
 
-    call_sv(callback, G_SCALAR);
+        call_sv(callback, G_SCALAR);
  
-    SPAGAIN;
+        SPAGAIN;
 
-    SV * ret = POPs;
+        SV * ret = POPs;
 
-    if (SvTRUE(ret))
-        matched = 1;
-    else
+        if (SvTRUE(ret))
+            matched = 1;
+        else
+            matched = 0;
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    } else {
         matched = 0;
-
-    PUTBACK;
-    FREETMPS;
-    LEAVE;
+    }
 
     return matched;
 }

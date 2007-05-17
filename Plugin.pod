@@ -149,7 +149,7 @@ hashrefs, objects, etc.
 =head2 mod
 
     my %mod = $rx->mod;
-    say "has /ix" if $mod{i} and $mod{x};
+    say "has /ix" if %mod ~~ 'i' and %mod ~~ 'x';
 
 A key-value pair list of the modifiers the pattern was compiled with.
 The keys will zero or more of C<imsxp> and the values will be true
