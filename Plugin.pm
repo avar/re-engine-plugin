@@ -1,44 +1,41 @@
 # See Plugin.pod for documentation
 package re::engine::Plugin;
 use 5.009005;
+use base 'Regexp';
 use strict;
-use Carp 'croak';
-use Scalar::Util 'weaken';
 use XSLoader ();
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 XSLoader::load __PACKAGE__, $VERSION;
 
-my $RE_ENGINE_PLUGIN = get_engine_plugin();
-my $NULL = 0;
+my $RE_ENGINE_PLUGIN = ENGINE();
 
 # How many? Used to cheat %^H
-my $callback = 0;
-# Valid callbacks
-my @callback = qw(comp exec intuit checkstr free dupe);
+my $callback = 1;
+
 # Where we store our CODE refs
 my %callback;
+
+# Generate a key to use in the %^H hash from a string, prefix the
+# package name like L<pragma> does
+my $key = sub { __PACKAGE__ . "::" . $_[0] };
 
 sub import
 {
     my ($pkg, %sub) = @_;
 
-    #$sub{$_} = sub {}
+    # Valid callbacks
+    my @callback = qw(comp exec intuit checkstr free dupe);
 
     for (@callback) {
         next unless exists $sub{$_};
         my $cb = delete $sub{$_};
 
-        # Convert "package::sub" to CODE if it isn't CODE already
         unless (ref $cb eq 'CODE') {
-            no strict 'refs';
-            $cb = *{$cb}{CODE};
+            require Carp;
+            Carp::croak("'$_' is not CODE");
         }
-
-        # Whine if we don't get a CODE ref or a valid package::sub name
-        croak "'$_' is not CODE and neither is the *{$cb}{CODE} fallback"
-            unless ref $cb eq 'CODE';
 
         # Get an ID to use
         my $id = $callback ++;
@@ -46,14 +43,9 @@ sub import
         # Insert into our callback storage,
         $callback{$_}->{$id} = $cb;
 
-        # Weaken it so we don't end up hanging on to something the
-        # caller doesn't care about anymore
-        #weaken($callback{$_}->{$id}); # EEK, too weak!
-
         # Instert into our cache with a key we can retrive later
         # knowing the ID in %^H and what callback we're getting
-        my $key = callback_key($_);
-        $^H{$key} = $id;
+        $^H{ $key->($_) } = $id;
     }
 
     $^H{regcomp} = $RE_ENGINE_PLUGIN;
@@ -61,31 +53,34 @@ sub import
 
 sub unimport
 {
-    my ($pkg) = @_;
-
     # Delete the regcomp hook
-    delete $^H{regcomp} if $^H{regcomp} == $RE_ENGINE_PLUGIN;
+    delete $^H{regcomp}
+        if $^H{regcomp} == $RE_ENGINE_PLUGIN;
 }
 
-sub callback_key
-{
-    my ($name) = @_;
-
-    sprintf "rep_%s", $name;
-}
-
-# Minimal function to be called from the XS
-sub get_callback
+# Minimal function to get CODE for a given key to be called by the
+# get_H_callback C function.
+sub _get_callback
 {
     my ($name) = @_; # 'comp', 'exec', ...
 
-    my $key = callback_key($name);
     my $h = (caller(0))[10];
-    my $id = $h->{$key};
+    my $id = $h->{ $key->($name) };
 
     my $cb = defined $id ? $callback{$name}->{$id} : 0;
 
     return $cb;
+}
+
+sub num_captures
+{
+    my ($re, %callback) = @_;
+
+    for my $key (keys %callback) {
+        $key =~ y/a-z/A-Z/; # ASCII uc
+        my $name = '_num_capture_buff_' . $key;
+        $re->$name( $callback{$key} );
+    }
 }
 
 1;

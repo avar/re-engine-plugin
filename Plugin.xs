@@ -1,37 +1,7 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
-
-#define SAVEPVN(p,n)	((p) ? savepvn(p,n) : NULL)
-
-START_EXTERN_C
-
-EXTERN_C const regexp_engine engine_plugin;
-
-END_EXTERN_C
-
-/*
- * Our struct which gets initiated and used as our object
- * ($re). Since we can't count on the regexp structure provided by
- * perl to be alive between comp/exec etc. we pull stuff from it and
- * save it in our own structure.
- *
- * Besides, creating Perl accessors which directly muck with perl's
- * own regexp structures in different phases of regex execution would
- * be a little too evil.
- */
-typedef struct replug {
-    SV * pattern;
-    char flags[sizeof("ecgimsxp")];
-
-    I32 minlen;
-    U32 gofs;
-
-    SV * stash;
-
-    U32 nparens;
-    AV * captures; /* Array of SV* that'll become $1, $2, ... */
-} *re__engine__Plugin;
+#include "Plugin.h"
 
 SV*
 get_H_callback(const char* key)
@@ -41,21 +11,25 @@ get_H_callback(const char* key)
 
     SV * callback;
 
-    ENTER;    
+    ENTER;
     SAVETMPS;
    
     PUSHMARK(SP);
     XPUSHs(sv_2mortal(newSVpv(key, 0)));
     PUTBACK;
 
-    call_pv("re::engine::Plugin::get_callback", G_SCALAR);
+    call_pv("re::engine::Plugin::_get_callback", G_SCALAR);
 
     SPAGAIN;
 
     callback = POPs;
-    SvREFCNT_inc(callback);
+    SvREFCNT_inc(callback); /* refcount++ or FREETMPS below will collect us */
 
-    if (!SvROK(callback)) { callback = NULL; }// croak("ret value not a ref"); }
+    /* If we don't get a valid CODE value return a NULL callback, in
+     * that case the hooks won't call back into Perl space */
+    if (!SvROK(callback) || SvTYPE(SvRV(callback)) != SVt_PVCV) {
+        callback = NULL;
+    }
 
     PUTBACK;
     FREETMPS;
@@ -64,110 +38,52 @@ get_H_callback(const char* key)
     return callback;
 }
 
-/* just learn to use gdb you lazy bum! */
-#if 0
-void
-dump_r_info(const char* id, regexp *r)
-{
-    warn("%s:", id);
-    warn("\textflags = %d", r->extflags);
-    warn("\tminlen = %d", r->minlen);
-    warn("\tminlenren = %d", r->minlenret);
-    warn("\tgofs = %d", r->gofs);
-    warn("\tnparens = %d", r->nparens);
-    warn("\tpprivate = %p", r->pprivate);
-    warn("\tsubbeg = %s", r->subbeg);
-    warn("\tsublen = %d", r->sublen);
-    warn("\tprecomp = %s", r->precomp);
-    warn("\tprelen = %d", r->prelen);
-    warn("\twrapped = %s", r->wrapped);
-    warn("\twraplen = %d", r->wraplen);
-    warn("\tseen_evals = %d", r->seen_evals);
-    warn("\trefcnt = %d", r->refcnt);
-    
-}
-#endif
-
-regexp *
-Plugin_comp(pTHX_ char *exp, char *xend, PMOP *pm)
+REGEXP *
+Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
 {
     dSP;
-    register regexp *r;
-    int count;
-
-    /*
-     * Allocate a new regexp struct, we must only write to the intflags,
-     * engine and private members and the others must be populated,
-     * internals expect the regex to have certain values least our code
-     * blow up
-     */
-
-    Newxz(r,1,regexp);
-
-    /* Set up the regex to be handled by this plugin */
-    r->engine = &engine_plugin;
-
-    /* Store the initial flags */
-    r->intflags = pm->op_pmflags;
-    r->pprivate = NULL; /* this is set to our object below */
-
-    /*
-     * Populate the regexp members for the engine
-     */
-
-    /* Ref count of the pattern */
-    r->refcnt = 1;
-
-    /* Preserve a copy of the original pattern */
-    r->prelen = xend - exp;
-    r->precomp = SAVEPVN(exp, r->prelen);
-
-    /* these may be changed by accessors */
-    r->minlen = 0;
-    r->minlenret = 0;
-    r->gofs = 0;
-    r->nparens = 0;
-
-    /* Store the flags as perl expects them */
-    r->extflags = pm->op_pmflags & RXf_PMf_COMPILETIME;
-
-    /*
-     * Construct a new B<re::engine::Plugin> object that'll carry around
-     * our data inside C<< r->pprivate >>. The object is a blessed void*
-     * that points to our replug struct which holds any state we want to
-     * keep.
-     */
+    REGEXP * rx;
     re__engine__Plugin re;
-    Newz(0, re, 1, struct replug);
-    
+    I32 count;
+    I32 buffers;
+
+    /* exp/xend version of the pattern & length */
+    STRLEN plen;
+    char*  exp = SvPV((SV*)pattern, plen);
+    char* xend = exp + plen;
+
+    /* The REGEXP structure to return to perl */
+    Newxz(rx, 1, REGEXP);
+
+    /* Our blessed object */
     SV *obj = newSV(0);
     SvREFCNT_inc(obj);
+    Newxz(re, 1, struct replug);
+    sv_setref_pv(obj, "re::engine::Plugin", (void*)re);
 
-    /* Bless into this package; TODO: make it subclassable */
-    const char * pkg = "re::engine::Plugin";
-    /* bless it */
-    sv_setref_pv(obj, pkg, (void*)re);
+    re->rx = rx;                   /* Make the rx accessible from self->rx */
+    rx->refcnt = 1;                /* Refcount so we won' be destroyed */
+    rx->intflags = flags;          /* Flags for internal use */
+    rx->extflags = flags;          /* Flags for perl to use */
+    rx->engine = RE_ENGINE_PLUGIN; /* Compile to use this engine */
+
+    /* Store a precompiled regexp for pp_regcomp to use */
+    rx->prelen = plen;
+    rx->precomp = savepvn(exp, rx->prelen);
+
+    /* Set up qr// stringification to be equivalent to the supplied
+     * pattern, this should be done via overload eventually.
+     */
+    rx->wraplen = rx->prelen;
+    Newx(rx->wrapped, rx->wraplen, char);
+    Copy(rx->precomp, rx->wrapped, rx->wraplen, char);
 
     /* Store our private object */
-    r->pprivate = obj;
+    rx->pprivate = obj;
 
-    re->pattern = newSVpvn(SAVEPVN(exp, xend - exp), xend - exp);
+    /* Store the pattern for ->pattern */
+    re->pattern = (SV*)pattern;
     SvREFCNT_inc(re->pattern);
-
-    /* Concat [ec]gimosxp (egimosxp & cgimosxp into) the flags string as
-     * appropriate
-     */
-    if (r->intflags & PMf_EVAL)       { strcat(re->flags, "e"); }
-    if (r->intflags & PMf_CONTINUE)   { strcat(re->flags, "c"); }
-    if (r->intflags & PMf_GLOBAL)     { strcat(re->flags, "g"); }
-    if (r->intflags & PMf_FOLD)       { strcat(re->flags, "i"); }
-    if (r->intflags & PMf_MULTILINE)  { strcat(re->flags, "m"); }
-    if (r->intflags & PMf_ONCE)       { strcat(re->flags, "o"); }
-    if (r->intflags & PMf_SINGLELINE) { strcat(re->flags, "s"); }
-    if (r->intflags & PMf_EXTENDED)   { strcat(re->flags, "x"); }
-    if (((r->extflags & RXf_PMf_KEEPCOPY) == RXf_PMf_KEEPCOPY)) {
-        strcat(re->flags, "p"); 
-    }
 
     /*
      * Call our callback function if one was defined, if not we've
@@ -182,11 +98,9 @@ Plugin_comp(pTHX_ char *exp, char *xend, PMOP *pm)
    
         PUSHMARK(SP);
         XPUSHs(obj);
-        XPUSHs(sv_2mortal(newSVpv(exp, xend - exp)));
-    
         PUTBACK;
 
-        call_sv(get_H_callback("comp"), G_DISCARD);
+        call_sv(callback, G_DISCARD);
 
         FREETMPS;
         LEAVE;
@@ -195,129 +109,237 @@ Plugin_comp(pTHX_ char *exp, char *xend, PMOP *pm)
     /* If any of the comp-time accessors were called we'll have to
      * update the regexp struct with the new info.
      */
-    if (re->minlen)  r->minlen  = re->minlen;
-    if (re->gofs)    r->gofs    = re->gofs;
-    if (re->gofs)    r->gofs    = re->gofs;
-    if (re->nparens) r->nparens = re->nparens;
 
-    int buffers = r->nparens;
+    buffers = rx->nparens;
 
-    //r->nparens = (buffers - 1);
-    Newxz(r->startp, buffers, I32);
-    Newxz(r->endp, buffers, I32);
+    Newxz(rx->offs, buffers, regexp_paren_pair);
 
-    /* return the regexp */
-    return r;
+    return rx;
 }
 
 I32
-Plugin_exec(pTHX_ register regexp *r, char *stringarg, register char *strend,
-                  char *strbeg, I32 minend, SV *sv, void *data, U32 flags)
+Plugin_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
+            char *strbeg, I32 minend, SV *sv, void *data, U32 flags)
 {
     dSP;
-    I32 rc;
-    int *ovector;
-    I32 i;
-    int count;
-    int ret;
+    I32 matched;
+    SV * callback = get_H_callback("exec");
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
-    /*Newx(ovector,r->nparens,int);*/
+    /* Store the current str for ->str */
+    self->str = (SV*)sv;
+    SvREFCNT_inc(self->str);
 
-    SV* callback = get_H_callback("exec");
-
-    ENTER;    
+    ENTER;
     SAVETMPS;
    
     PUSHMARK(SP);
-
-    XPUSHs(r->pprivate);
+    XPUSHs(rx->pprivate);
     XPUSHs(sv);
-
     PUTBACK;
 
-    count = call_sv(callback, G_ARRAY);
+    call_sv(callback, G_SCALAR);
  
     SPAGAIN;
 
-    SV * SvRet = POPs;
+    SV * ret = POPs;
 
-    if (SvTRUE(SvRet)) {
-        /* Match vars */
-
-        /*
-        r->sublen = strend-strbeg;
-        r->subbeg = savepvn(strbeg,r->sublen);
-        r->startp[1] = 0;
-        r->endp[1] = 5;
-        */
-
-        ret = 1;
-    } else {
-        ret = 0;
-    }
+    if (SvTRUE(ret))
+        matched = 1;
+    else
+        matched = 0;
 
     PUTBACK;
     FREETMPS;
     LEAVE;
 
-    return ret;
+    return matched;
 }
 
 char *
-Plugin_intuit(pTHX_ regexp *prog, SV *sv, char *strpos,
+Plugin_intuit(pTHX_ REGEXP * const rx, SV *sv, char *strpos,
                      char *strend, U32 flags, re_scream_pos_data *data)
 {
+    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(sv);
+    PERL_UNUSED_ARG(strpos);
+    PERL_UNUSED_ARG(strend);
+    PERL_UNUSED_ARG(flags);
+    PERL_UNUSED_ARG(data);
     return NULL;
 }
 
 SV *
-Plugin_checkstr(pTHX_ regexp *prog)
+Plugin_checkstr(pTHX_ REGEXP * const rx)
 {
+    PERL_UNUSED_ARG(rx);
     return NULL;
 }
 
 void
-Plugin_free(pTHX_ struct regexp *r)
+Plugin_free(pTHX_ REGEXP * const rx)
 {
-    /*sv_2mortal(r->pprivate);*/
-    /*PerlMemShared_free(r->pprivate);*/
+    PERL_UNUSED_ARG(rx);
+/*
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_free;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        PUTBACK;
+
+        call_sv(callback, G_DISCARD);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+    return;
+*/
 }
 
 void *
-Plugin_dupe(pTHX_ const regexp *r, CLONE_PARAMS *param)
+Plugin_dupe(pTHX_ const REGEXP * rx, CLONE_PARAMS *param)
 {
-    return r->pprivate;
+    Perl_croak("dupe not supported yet");
+    return rx->pprivate;
 }
 
-SV*
-Plugin_numbered_buff_get(pTHX_ const REGEXP * const rx, I32 paren, SV* usesv)
+
+void
+Plugin_numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
+                           SV * const sv)
 {
+    dSP;
+    I32 items;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_num_capture_buff_FETCH;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(paren)));
+        PUTBACK;
+
+        items = call_sv(callback, G_SCALAR);
+        
+        if (items == 1) {
+            SPAGAIN;
+
+            SV * ret = POPs;
+            sv_setsv(sv, ret);
+        } else {
+            sv_setsv(sv, &PL_sv_undef);
+        }
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    } else {
+        sv_setsv(sv, &PL_sv_undef);
+    }
+}
+
+void
+Plugin_numbered_buff_STORE(pTHX_ REGEXP * const rx, const I32 paren,
+                           SV const * const value)
+{
+    dSP;
+    I32 items;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_num_capture_buff_STORE;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(paren)));
+        XPUSHs(SvREFCNT_inc(value));
+        PUTBACK;
+
+        call_sv(callback, G_DISCARD);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+}
+
+I32
+Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
+                              const I32 paren)
+{
+    dSP;
+    I32 items;
+    SV * callback;
+    re__engine__Plugin self;
+
+    SELF_FROM_PPRIVATE(self,rx->pprivate);
+
+    callback = self->cb_num_capture_buff_LENGTH;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(paren)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        IV ret = POPi;
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return (I32)ret;
+    } else {
+        /* TODO: call FETCH and get the length on that value */
+        return 0;
+    }
+}
+
+
+SV*
+Plugin_named_buff_FETCH(pTHX_ REGEXP * const rx, SV * const key, U32 flags)
+{
+    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(key);
+    PERL_UNUSED_ARG(flags);
+
     return NULL;
 }
 
 SV*
-Plugin_named_buff_get(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags)
+Plugin_package(pTHX_ REGEXP * const rx)
 {
-    return NULL;
+    PERL_UNUSED_ARG(rx);
+    return newSVpvs("re::engine::Plugin");
 }
-
-/*
- * The function pointers we're telling the regex engine to use
- */
-const regexp_engine engine_plugin = {
-        Plugin_comp,
-        Plugin_exec,
-        Plugin_intuit,
-        Plugin_checkstr,
-        Plugin_free,
-        Plugin_numbered_buff_get,
-        Plugin_named_buff_get,
-#if defined(USE_ITHREADS)        
-        Plugin_dupe,
-#endif
-};
 
 MODULE = re::engine::Plugin	PACKAGE = re::engine::Plugin
+PROTOTYPES: ENABLE
 
 SV *
 pattern(re::engine::Plugin self, ...)
@@ -327,12 +349,46 @@ CODE:
 OUTPUT:
     RETVAL
 
-char*
-flags(re::engine::Plugin self, ...)
+SV *
+str(re::engine::Plugin self, ...)
 CODE:
-    RETVAL = self->flags;
+    SvREFCNT_inc(self->str);
+    RETVAL = self->str;
 OUTPUT:
     RETVAL
+
+char*
+mod(re::engine::Plugin self, ...)
+PPCODE:
+    /* /i */
+    if (self->rx->intflags & PMf_FOLD) {
+      XPUSHs(sv_2mortal(newSVpvs("i")));
+      XPUSHs(&PL_sv_yes);
+    }
+
+    /* /m */
+    if (self->rx->intflags & PMf_MULTILINE) {
+      XPUSHs(sv_2mortal(newSVpvs("m")));
+      XPUSHs(&PL_sv_yes);
+    }
+
+    /* /s */
+    if (self->rx->intflags & PMf_SINGLELINE) {
+      XPUSHs(sv_2mortal(newSVpvs("s")));
+      XPUSHs(&PL_sv_yes);
+    }
+
+    /* /x */
+    if (self->rx->intflags & PMf_EXTENDED) {
+      XPUSHs(sv_2mortal(newSVpvs("x")));
+      XPUSHs(&PL_sv_yes);
+    }
+
+    /* /p */
+    if (self->rx->intflags & RXf_PMf_KEEPCOPY) {
+      XPUSHs(sv_2mortal(newSVpvs("p")));
+      XPUSHs(&PL_sv_yes);
+    }
 
 SV *
 stash(re::engine::Plugin self, ...)
@@ -352,10 +408,10 @@ SV *
 minlen(re::engine::Plugin self, ...)
 CODE:
     if (items > 1) {
-        self->minlen = (I32)SvIV(ST(1));
+        self->rx->minlen = (I32)SvIV(ST(1));
     }
 
-    RETVAL = self->minlen ? newSViv(self->minlen) : &PL_sv_undef;
+    RETVAL = self->rx->minlen ? newSViv(self->rx->minlen) : &PL_sv_undef;
 OUTPUT:
     RETVAL
 
@@ -363,9 +419,9 @@ SV *
 gofs(re::engine::Plugin self, ...)
 CODE:
     if (items > 1) {
-        self->gofs = (U32)SvIV(ST(1));
+        self->rx->gofs = (U32)SvIV(ST(1));
     }
-    RETVAL = self->gofs ? newSVuv(self->gofs) : &PL_sv_undef;
+    RETVAL = self->rx->gofs ? newSVuv(self->rx->gofs) : &PL_sv_undef;
 OUTPUT:
     RETVAL
 
@@ -373,22 +429,37 @@ SV *
 nparens(re::engine::Plugin self, ...)
 CODE:
     if (items > 1) {
-        self->nparens = (U32)SvIV(ST(1));
+        self->rx->nparens = (U32)SvIV(ST(1));
     }
-    RETVAL = self->gofs ? newSVuv(self->gofs) : &PL_sv_undef;
+    RETVAL = self->rx->nparens ? newSVuv(self->rx->nparens) : &PL_sv_undef;
 OUTPUT:
     RETVAL
 
 void
-captures(re::engine::Plugin self, ...)
+_num_capture_buff_FETCH(re::engine::Plugin self, ...)
 PPCODE:
     if (items > 1) {
-        self->minlen = (I32)SvIV(ST(1));
+        self->cb_num_capture_buff_FETCH = ST(1);
+        SvREFCNT_inc(self->cb_num_capture_buff_FETCH);
     }
-    XPUSHs(sv_2mortal(newSViv(5)));
-    XPUSHs(sv_2mortal(newSViv(10)));
 
 void
-get_engine_plugin()
+_num_capture_buff_STORE(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_num_capture_buff_STORE = ST(1);
+        SvREFCNT_inc(self->cb_num_capture_buff_STORE);
+    }
+
+void
+_num_capture_buff_LENGTH(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_num_capture_buff_LENGTH = ST(1);
+        SvREFCNT_inc(self->cb_num_capture_buff_LENGTH);
+    }
+
+void
+ENGINE()
 PPCODE:
     XPUSHs(sv_2mortal(newSViv(PTR2IV(&engine_plugin))));

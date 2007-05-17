@@ -1,4 +1,4 @@
-abstract: Pure-Perl regular expression engine plugin interface
+abstract: Regular Expression engine API
 author: "\xC3\x86var Arnfj\xC3\xB6r\xC3\xB0 Bjarmason <avar@cpan.org>"
 build_requires: 
   Test::More: 0

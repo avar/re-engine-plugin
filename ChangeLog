@@ -1,0 +1,8 @@
+2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.02)
+
+	* Brought up to date with current blead after lots of hacking on
+	  blead itself, too many changes to list
+
+2007-02-18 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.01)
+	
+	* Initial release
