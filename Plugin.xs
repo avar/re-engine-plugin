@@ -67,7 +67,7 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
     rx->extflags = flags;          /* Flags for perl to use */
     rx->engine = RE_ENGINE_PLUGIN; /* Compile to use this engine */
 
-    /* Store a precompiled regexp for pp_regcomp to use */
+    /* Precompiled regexp for pp_regcomp to use */
     rx->prelen = plen;
     rx->precomp = savepvn(exp, rx->prelen);
 
@@ -216,7 +216,6 @@ Plugin_dupe(pTHX_ const REGEXP * rx, CLONE_PARAMS *param)
     return rx->pprivate;
 }
 
-
 void
 Plugin_numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
                            SV * const sv)
@@ -292,9 +291,7 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
     dSP;
     I32 items;
     SV * callback;
-    re__engine__Plugin self;
-
-    SELF_FROM_PPRIVATE(self,rx->pprivate);
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_num_capture_buff_LENGTH;
 
@@ -328,11 +325,262 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
 SV*
 Plugin_named_buff_FETCH(pTHX_ REGEXP * const rx, SV * const key, U32 flags)
 {
-    PERL_UNUSED_ARG(rx);
-    PERL_UNUSED_ARG(key);
-    PERL_UNUSED_ARG(flags);
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
-    return NULL;
+    callback = self->cb_named_capture_buff_FETCH;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(SvREFCNT_inc(key));
+        XPUSHs(sv_2mortal(newSViv(flags & 1 ? 1 : 0)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        SV* ret = POPs;
+        SvREFCNT_inc(ret);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return ret;
+    } else {
+        return NULL;
+    }
+}
+
+void
+Plugin_named_buff_STORE(pTHX_ REGEXP * const rx, SV * const key,
+                        SV * const value, const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_STORE;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(SvREFCNT_inc(key));
+        XPUSHs(SvREFCNT_inc(value));
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_DISCARD);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+}
+
+void
+Plugin_named_buff_DELETE(pTHX_ REGEXP * const rx, SV * const key, const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_DELETE;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(SvREFCNT_inc(key));
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_DISCARD);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+}
+
+void
+Plugin_named_buff_CLEAR(pTHX_ REGEXP * const rx, const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_CLEAR;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_DISCARD);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+}
+
+bool
+Plugin_named_buff_EXISTS(pTHX_ REGEXP * const rx, SV * const key,
+                         const U32 flags)
+{
+    dSP;
+    SV * callback;
+    bool truthiness = FALSE;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_EXISTS;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(SvREFCNT_inc(key));
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        SV * ret = POPs;
+        truthiness = SvTRUE(ret);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+    }
+
+    return truthiness;
+}
+
+SV*
+Plugin_named_buff_FIRSTKEY(pTHX_ REGEXP * const rx, const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_FIRSTKEY;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        SV * ret = POPs;
+        SvREFCNT_inc(ret);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return ret;
+    } else {
+        return NULL;
+    }
+}
+
+SV*
+Plugin_named_buff_NEXTKEY(pTHX_ REGEXP * const rx, SV * const lastkey,
+                          const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_NEXTKEY;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(SvREFCNT_inc(lastkey));
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        SV * ret = POPs;
+        SvREFCNT_inc(ret);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return ret;
+    } else {
+        return NULL;
+    }
+}
+
+SV*
+Plugin_named_buff_SCALAR(pTHX_ REGEXP * const rx, const U32 flags)
+{
+    dSP;
+    SV * callback;
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    callback = self->cb_named_capture_buff_SCALAR;
+
+    if (callback) {
+        ENTER;
+        SAVETMPS;
+   
+        PUSHMARK(SP);
+        XPUSHs(rx->pprivate);
+        XPUSHs(sv_2mortal(newSViv(flags)));
+        PUTBACK;
+
+        call_sv(callback, G_SCALAR);
+
+        SPAGAIN;
+
+        SV * ret = POPs;
+        SvREFCNT_inc(ret);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return ret;
+    } else {
+        return NULL;
+    }
 }
 
 SV*
@@ -343,25 +591,19 @@ Plugin_package(pTHX_ REGEXP * const rx)
 }
 
 MODULE = re::engine::Plugin	PACKAGE = re::engine::Plugin
-PROTOTYPES: ENABLE
+PROTOTYPES: DISABLE
 
-SV *
+void
 pattern(re::engine::Plugin self, ...)
-CODE:
-    SvREFCNT_inc(self->pattern);
-    RETVAL = self->pattern;
-OUTPUT:
-    RETVAL
+PPCODE:
+    XPUSHs(self->pattern);
 
-SV *
+void
 str(re::engine::Plugin self, ...)
-CODE:
-    SvREFCNT_inc(self->str);
-    RETVAL = self->str;
-OUTPUT:
-    RETVAL
+PPCODE:
+    XPUSHs(self->str);
 
-char*
+void
 mod(re::engine::Plugin self, ...)
 PPCODE:
     /* /i */
@@ -394,50 +636,58 @@ PPCODE:
       XPUSHs(&PL_sv_yes);
     }
 
-SV *
+void
 stash(re::engine::Plugin self, ...)
-PREINIT:
-    SV * stash;
-CODE:
+PPCODE:
     if (items > 1) {
-        self->stash = sv_mortalcopy(ST(1));
+        self->stash = ST(1);
         SvREFCNT_inc(self->stash);
+        XSRETURN_EMPTY;
+    } else {
+        XPUSHs(self->stash);
     }
-    SvREFCNT_inc(self->stash);
-    RETVAL = self->stash;
-OUTPUT:
-    RETVAL
 
-SV *
+void
 minlen(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->minlen = (I32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->minlen) {
+            XPUSHs(sv_2mortal(newSViv(self->rx->minlen)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
 
-    RETVAL = self->rx->minlen ? newSViv(self->rx->minlen) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
-
-SV *
+void
 gofs(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->gofs = (U32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->gofs) {
+            XPUSHs(sv_2mortal(newSVuv(self->rx->gofs)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
-    RETVAL = self->rx->gofs ? newSVuv(self->rx->gofs) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
 
-SV *
+void
 nparens(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->nparens = (U32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->nparens) {
+            XPUSHs(sv_2mortal(newSVuv(self->rx->nparens)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
-    RETVAL = self->rx->nparens ? newSVuv(self->rx->nparens) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
 
 void
 _num_capture_buff_FETCH(re::engine::Plugin self, ...)
@@ -461,6 +711,70 @@ PPCODE:
     if (items > 1) {
         self->cb_num_capture_buff_LENGTH = ST(1);
         SvREFCNT_inc(self->cb_num_capture_buff_LENGTH);
+    }
+
+void
+_named_capture_buff_FETCH(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_FETCH = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_FETCH);
+    }
+
+void
+_named_capture_buff_STORE(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_STORE = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_STORE);
+    }
+
+void
+_named_capture_buff_DELETE(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_DELETE = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_DELETE);
+    }
+
+void
+_named_capture_buff_CLEAR(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_CLEAR = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_CLEAR);
+    }
+
+void
+_named_capture_buff_EXISTS(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_EXISTS = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_EXISTS);
+    }
+
+void
+_named_capture_buff_FIRSTKEY(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_FIRSTKEY = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_FIRSTKEY);
+    }
+
+void
+_named_capture_buff_NEXTKEY(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_NEXTKEY = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_NEXTKEY);
+    }
+
+void
+_named_capture_buff_SCALAR(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        self->cb_named_capture_buff_SCALAR = ST(1);
+        SvREFCNT_inc(self->cb_named_capture_buff_SCALAR);
     }
 
 void

@@ -4,18 +4,18 @@ use re::engine::Plugin (
     exec => sub {
         my ($re, $str) = @_;
 
-        is_deeply($str, $re->str);
+        isa_ok($str, $re->pattern);
 
         return 1;
     },
 );
 
 my $sv;
-"SCALAR" =~ \$sv;
-"REF"    =~ \\$sv;
-"ARRAY"  =~ [];
-"HASH"   =~ {};
-"GLOB"   =~ \*STDIN;
-"CODE"   =~ sub {};
-"main"   =~ bless {} => "main";
+\$sv    =~ "SCALAR";
+\\$sv   =~ "REF";
+[]      =~ "ARRAY";
+{}      =~ "HASH";
+\*STDIN =~ "GLOB";
+sub {}  =~ "CODE";
+bless({} => "main") =~ "main"
 

@@ -14,6 +14,7 @@ inc/Module/Install/WriteAll.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
+named-capture.patch
 Plugin.h
 Plugin.pm
 Plugin.pod
@@ -21,8 +22,6 @@ Plugin.xs
 t/00-compile.t
 t/eval-comp.t
 t/eval-exec.t
-t/Example.pm
-t/Example.t
 t/import.t
 t/methods.t
 t/methods/free.t
@@ -33,11 +32,24 @@ t/methods/mod.t
 t/methods/pattern/modify.t
 t/methods/pattern/types.t
 t/methods/stash.t
+t/methods/str/modify.t
 t/methods/str/types.t
 t/methods/str/undef.t
+t/named_buff/CLEAR.t
+t/named_buff/DELETE.t
+t/named_buff/EXISTS.t
+t/named_buff/FETCH.t
+t/named_buff/FIRSTKEY.t
+t/named_buff/NEXTKEY.t
+t/named_buff/SCALAR.t
+t/named_buff/STORE.t
 t/num_buff/FETCH.t
 t/num_buff/LENGTH.t
 t/num_buff/STORE.t
 t/taint/rx.t
 t/taint/util.t
+t/usage/basic.pm
+t/usage/basic.t
+t/usage/import.pm
+t/usage/import.t
 typemap

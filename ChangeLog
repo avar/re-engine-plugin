@@ -1,3 +1,22 @@
+2007-05-29 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.04_01)
+
+	* Plugin.xs: Implementation of named buffer callbacks, there is
+	             some debate about whether this patch should go into
+	             blead so I'm making a dev release
+	* named_capture.patch: The patch to blead that makes this tick
+	* Plugin.xs: Dumped CODE: in favor of PPCODE:, the former is teh sux
+	* Plugin.xs: Minor cleanups here and there
+	* Plugin.pod: New todo and a developer release notice
+	* Plugin.h: Named buffer callbacks
+	* Plugin.pm: Named buffer callbacks
+	* t/methods/stash.t: Test return value of $rx->stash({});
+	* t/methods/str/modify.t: New test for modification of ->str when
+	                          a reference is used
+	* t/methods/str/types.t: This was testing pattern types, fixed
+	
+	* t/Example.[t|pm]: Moved to t/usage
+	* t/named_buff: Tests for named buffer callbacks
+
 2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.03)
 	
 	* Plugin.xs: The exec callback would call_sv on a NULL value

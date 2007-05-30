@@ -1,0 +1,1527 @@
+diff --git a/embed.fnc b/embed.fnc
+index fec5643..643c652 100644
+--- a/embed.fnc
++++ b/embed.fnc
+@@ -694,7 +694,15 @@ Ap	|I32	|regexec_flags	|NN REGEXP * const rx|NN char* stringarg \
+ 				|NN SV* screamer|NULLOK void* data|U32 flags
+ ApR	|regnode*|regnext	|NN regnode* p
+ 
+-EXp	|SV*|reg_named_buff_fetch	|NN REGEXP * const rx|NN SV * const key|const U32 flags
++EXp |SV*|reg_named_buff_fetch    |NN REGEXP * const rx|NN SV * const namesv|const U32 flags
++EXp |void|reg_named_buff_store   |NN REGEXP * const rx|NN SV * const key \
++                                 |NN SV * const value|const U32 flags
++EXp |void|reg_named_buff_delete  |NN REGEXP * const rx|NN SV * const key|const U32 flags
++EXp |void|reg_named_buff_clear   |NN REGEXP * const rx|const U32 flags
++EXp |bool|reg_named_buff_exists  |NN REGEXP * const rx|NN SV * const key|const U32 flags
++EXp |SV*|reg_named_buff_firstkey |NN REGEXP * const rx|const U32 flags
++EXp |SV*|reg_named_buff_nextkey  |NN REGEXP * const rx|NN SV * const lastkey|const U32 flags
++EXp |SV*|reg_named_buff_scalar   |NN REGEXP * const rx|const U32 flags
+ 
+ EXp	|void|reg_numbered_buff_fetch|NN REGEXP * const rx|const I32 paren|NULLOK SV * const sv
+ EXp	|void|reg_numbered_buff_store|NN REGEXP * const rx|const I32 paren|NULLOK SV const * const value
+diff --git a/embed.h b/embed.h
+index 8e0ecba..aa0aa72 100644
+--- a/embed.h
++++ b/embed.h
+@@ -705,6 +705,13 @@
+ #define regnext			Perl_regnext
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_named_buff_fetch	Perl_reg_named_buff_fetch
++#define reg_named_buff_store	Perl_reg_named_buff_store
++#define reg_named_buff_delete	Perl_reg_named_buff_delete
++#define reg_named_buff_clear	Perl_reg_named_buff_clear
++#define reg_named_buff_exists	Perl_reg_named_buff_exists
++#define reg_named_buff_firstkey	Perl_reg_named_buff_firstkey
++#define reg_named_buff_nextkey	Perl_reg_named_buff_nextkey
++#define reg_named_buff_scalar	Perl_reg_named_buff_scalar
+ #endif
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_numbered_buff_fetch	Perl_reg_numbered_buff_fetch
+@@ -2981,6 +2988,13 @@
+ #define regnext(a)		Perl_regnext(aTHX_ a)
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_named_buff_fetch(a,b,c)	Perl_reg_named_buff_fetch(aTHX_ a,b,c)
++#define reg_named_buff_store(a,b,c,d)	Perl_reg_named_buff_store(aTHX_ a,b,c,d)
++#define reg_named_buff_delete(a,b,c)	Perl_reg_named_buff_delete(aTHX_ a,b,c)
++#define reg_named_buff_clear(a,b)	Perl_reg_named_buff_clear(aTHX_ a,b)
++#define reg_named_buff_exists(a,b,c)	Perl_reg_named_buff_exists(aTHX_ a,b,c)
++#define reg_named_buff_firstkey(a,b)	Perl_reg_named_buff_firstkey(aTHX_ a,b)
++#define reg_named_buff_nextkey(a,b,c)	Perl_reg_named_buff_nextkey(aTHX_ a,b,c)
++#define reg_named_buff_scalar(a,b)	Perl_reg_named_buff_scalar(aTHX_ a,b)
+ #endif
+ #if defined(PERL_CORE) || defined(PERL_EXT)
+ #define reg_numbered_buff_fetch(a,b,c)	Perl_reg_numbered_buff_fetch(aTHX_ a,b,c)
+diff --git a/ext/re/re.xs b/ext/re/re.xs
+index 1344065..fe59940 100644
+--- a/ext/re/re.xs
++++ b/ext/re/re.xs
+@@ -30,8 +30,22 @@ extern void	my_reg_numbered_buff_store(pTHX_ REGEXP * const rx, const I32 paren,
+ extern I32	my_reg_numbered_buff_length(pTHX_ REGEXP * const rx,
+ 					    const SV * const sv, const I32 paren);
+ 
+-extern SV*	my_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const key,
+-					const U32 flags);
++extern SV*	my_reg_named_buff_fetch(pTHX_ REGEXP * const, SV * const,
++									const U32);
++extern void	my_reg_named_buff_store(pTHX_ REGEXP * const rx,
++									SV * const key, SV * const value,
++									const U32 flags);
++extern void	my_reg_named_buff_delete(pTHX_ REGEXP * const rx,
++									 SV * const key, const U32 flags);
++extern void	my_reg_named_buff_clear(pTHX_ REGEXP * const rx, const U32 flags);
++extern bool	my_reg_named_buff_exists(pTHX_ REGEXP * const rx,
++									 SV * const key, const U32 flags);
++extern SV*	my_reg_named_buff_firstkey(pTHX_ REGEXP * const rx,
++									   const U32 flags);
++extern SV*	my_reg_named_buff_nextkey(pTHX_ REGEXP * const rx,
++									  SV * const lastkey, const U32 flags);
++extern SV*	my_reg_named_buff_scalar(pTHX_ REGEXP * const rx,
++									 const U32 flags);
+ 
+ extern SV*      my_reg_qr_package(pTHX_ REGEXP * const rx);
+ #if defined(USE_ITHREADS)
+@@ -52,6 +66,13 @@ const struct regexp_engine my_reg_engine = {
+         my_reg_numbered_buff_store,
+         my_reg_numbered_buff_length,
+         my_reg_named_buff_fetch,
++        my_reg_named_buff_store,
++        my_reg_named_buff_delete,
++        my_reg_named_buff_clear,
++        my_reg_named_buff_exists,
++        my_reg_named_buff_firstkey,
++        my_reg_named_buff_nextkey,
++        my_reg_named_buff_scalar,
+         my_reg_qr_package,
+ #if defined(USE_ITHREADS)
+         my_regdupe 
+diff --git a/ext/re/re_top.h b/ext/re/re_top.h
+index 5570ed7..23ee654 100644
+--- a/ext/re/re_top.h
++++ b/ext/re/re_top.h
+@@ -20,6 +20,13 @@
+ #define Perl_reg_numbered_buff_store  my_reg_numbered_buff_store
+ #define Perl_reg_numbered_buff_length  my_reg_numbered_buff_length
+ #define Perl_reg_named_buff_fetch  my_reg_named_buff_fetch
++#define Perl_reg_named_buff_store  my_reg_named_buff_store
++#define Perl_reg_named_buff_delete  my_reg_named_buff_delete
++#define Perl_reg_named_buff_clear  my_reg_named_buff_clear
++#define Perl_reg_named_buff_exists  my_reg_named_buff_exists
++#define Perl_reg_named_buff_firstkey  my_reg_named_buff_firstkey
++#define Perl_reg_named_buff_nextkey  my_reg_named_buff_nextkey
++#define Perl_reg_named_buff_scalar  my_reg_named_buff_scalar
+ #define Perl_reg_qr_package        my_reg_qr_package
+ 
+ #define PERL_NO_GET_CONTEXT
+diff --git a/ext/re/t/re_funcs.t b/ext/re/t/re_funcs.t
+index 0d9092a..fa3e11b 100644
+--- a/ext/re/t/re_funcs.t
++++ b/ext/re/t/re_funcs.t
+@@ -40,23 +40,17 @@ use re qw(is_regexp regexp_pattern regmust
+     is($floating,undef,"Regmust anchored - ref");
+ }
+ 
+-
+ if ('1234'=~/(?:(?<A>\d)|(?<C>!))(?<B>\d)(?<A>\d)(?<B>\d)/){
+     my @names = sort +regnames();
+     is("@names","A B","regnames");
++    my @names = sort +regnames(0);
++    is("@names","A B","regnames");
+     @names = sort +regnames(1);
+     is("@names","A B C","regnames");
+     is(join("", @{regname("A",1)}),"13");
+     is(join("", @{regname("B",1)}),"24");    
+     {
+         if ('foobar'=~/(?<foo>foo)(?<bar>bar)/) {
+-            regnames_iterinit();
+-            my @res;
+-            while (defined(my $key=regnames_iternext)) {
+-                push @res,$key;
+-            }
+-            @res=sort @res;
+-            is("@res","bar foo");
+             is(regnames_count(),2);
+         } else {
+             ok(0); ok(0);
+diff --git a/global.sym b/global.sym
+index c5181b4..0714bff 100644
+--- a/global.sym
++++ b/global.sym
+@@ -406,6 +406,13 @@ Perl_re_intuit_string
+ Perl_regexec_flags
+ Perl_regnext
+ Perl_reg_named_buff_fetch
++Perl_reg_named_buff_store
++Perl_reg_named_buff_delete
++Perl_reg_named_buff_clear
++Perl_reg_named_buff_exists
++Perl_reg_named_buff_firstkey
++Perl_reg_named_buff_nextkey
++Perl_reg_named_buff_scalar
+ Perl_reg_numbered_buff_fetch
+ Perl_reg_numbered_buff_store
+ Perl_reg_numbered_buff_length
+diff --git a/gv.c b/gv.c
+index 17f754f..8f98f00 100644
+--- a/gv.c
++++ b/gv.c
+@@ -1014,7 +1014,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
+ 	        if (*name == '!')
+ 		    require_tie_mod(gv, "!", newSVpvs("Errno"), "TIEHASH", 1);
+ 		else if (*name == '-' || *name == '+')
+-		    require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "FETCH", 0);
++		    require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "TIEHASH", 0);
+ 	    }
+ 	}
+ 	return gv;
+@@ -1224,7 +1224,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
+             SvREADONLY_on(av);
+ 
+             if (sv_type == SVt_PVHV || sv_type == SVt_PVGV)
+-                require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "FETCH", 0);
++                require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "TIEHASH", 0);
+ 
+             break;
+ 	}
+diff --git a/lib/Tie/Hash/NamedCapture.pm b/lib/Tie/Hash/NamedCapture.pm
+index 73bc20b..66cf1b5 100644
+--- a/lib/Tie/Hash/NamedCapture.pm
++++ b/lib/Tie/Hash/NamedCapture.pm
+@@ -1,52 +1,19 @@
+ package Tie::Hash::NamedCapture;
+ 
+-use strict;
+-use warnings;
++our $VERSION = "0.06";
+ 
+-our $VERSION = "0.05";
++# The real meat implemented in XS in universal.c in the core, but this
++# method was left behind because gv.c expects a Purl-Perl method in
++# this package when it loads the tie magic for %+ and %-
+ 
+-sub TIEHASH {
+-    my $classname = shift;
+-    my %opts = @_;
+-
+-    my $self = bless { all => $opts{all} }, $classname;
+-    return $self;
+-}
+-
+-sub FETCH {
+-    return re::regname($_[1],$_[0]->{all});
+-}
+-
+-sub STORE {
+-    require Carp;
+-    Carp::croak("STORE forbidden: hashes tied to ",__PACKAGE__," are read-only.");
+-}
+-
+-sub FIRSTKEY {
+-    re::regnames_iterinit();
+-    return $_[0]->NEXTKEY;
+-}
++# These should match the #defines in regexp.h
++sub RXf_HASH_ONE () { 0x00000001 } # %+
++sub RXf_HASH_ALL () { 0x00000002 } # %-
+ 
+-sub NEXTKEY {
+-    return re::regnames_iternext($_[0]->{all});
+-}
+-
+-sub EXISTS {
+-    return defined re::regname( $_[1], $_[0]->{all});
+-}
+-
+-sub DELETE {
+-    require Carp;
+-    Carp::croak("DELETE forbidden: hashes tied to ",__PACKAGE__," are read-only");
+-}
+-
+-sub CLEAR {
+-    require Carp;
+-    Carp::croak("CLEAR forbidden: hashes tied to ",__PACKAGE__," are read-only");
+-}
+-
+-sub SCALAR {
+-    return scalar re::regnames($_[0]->{all});
++sub TIEHASH {
++    my ($pkg, %arg) = @_;
++    my $flag = $arg{all} ? RXf_HASH_ALL : RXf_HASH_ONE;
++    bless \$flag => $pkg;
+ }
+ 
+ tie %+, __PACKAGE__;
+@@ -91,6 +58,7 @@ buffers that have captured (and that are thus associated to defined values).
+ 
+ =head1 SEE ALSO
+ 
+-L<re>, L<perlmodlib/Pragmatic Modules>, L<perlvar/"%+">, L<perlvar/"%-">.
++L<perlreapi>, L<re>, L<perlmodlib/Pragmatic Modules>, L<perlvar/"%+">,
++L<perlvar/"%-">.
+ 
+ =cut
+diff --git a/mg.c b/mg.c
+index 77ae021..bc08d4a 100644
+--- a/mg.c
++++ b/mg.c
+@@ -603,15 +603,15 @@ Perl_magic_len(pTHX_ SV *sv, MAGIC *mg)
+     }
+     case '`':
+       do_prematch:
+-      paren = -2;
++      paren = RXrf_PREMATCH;
+       goto maybegetparen;
+     case '\'':
+       do_postmatch:
+-      paren = -1;
++      paren = RXrf_POSTMATCH;
+       goto maybegetparen;
+     case '&':
+       do_match:
+-      paren = 0;
++      paren = RXrf_MATCH;
+       goto maybegetparen;
+     case '1': case '2': case '3': case '4':
+     case '5': case '6': case '7': case '8': case '9':
+@@ -2235,15 +2235,15 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
+           goto do_match;
+     case '`': /* ${^PREMATCH} caught below */
+       do_prematch:
+-      paren = -2;
++      paren = RXrf_PREMATCH;
+       goto setparen;
+     case '\'': /* ${^POSTMATCH} caught below */
+       do_postmatch:
+-      paren = -1;
++      paren = RXrf_POSTMATCH;
+       goto setparen;
+     case '&':
+       do_match:
+-      paren = 0;
++      paren = RXrf_MATCH;
+       goto setparen;
+     case '1': case '2': case '3': case '4':
+     case '5': case '6': case '7': case '8': case '9':
+diff --git a/perl.h b/perl.h
+index 8cd8753..0a4aebf 100644
+--- a/perl.h
++++ b/perl.h
+@@ -231,6 +231,27 @@
+ #define CALLREG_NAMEDBUF_FETCH(rx,name,flags) \
+     CALL_FPTR((rx)->engine->named_buff_FETCH)(aTHX_ (rx),(name),(flags))
+ 
++#define CALLREG_NAMEDBUF_STORE(rx,key,value,flags) \
++    CALL_FPTR((rx)->engine->named_buff_STORE)(aTHX_ (rx),(key),(value),(flags))
++
++#define CALLREG_NAMEDBUF_DELETE(rx,key,flags) \
++    CALL_FPTR((rx)->engine->named_buff_DELETE)(aTHX_ (rx),(key),(flags))
++
++#define CALLREG_NAMEDBUF_CLEAR(rx,flags) \
++    CALL_FPTR((rx)->engine->named_buff_CLEAR)(aTHX_ (rx),(flags))
++
++#define CALLREG_NAMEDBUF_EXISTS(rx,key,flags) \
++    CALL_FPTR((rx)->engine->named_buff_EXISTS)(aTHX_ (rx),(key),(flags))
++
++#define CALLREG_NAMEDBUF_FIRSTKEY(rx,flags) \
++    CALL_FPTR((rx)->engine->named_buff_FIRSTKEY)(aTHX_ (rx),(flags))
++
++#define CALLREG_NAMEDBUF_NEXTKEY(rx,lastkey,flags) \
++    CALL_FPTR((rx)->engine->named_buff_NEXTKEY)(aTHX_ (rx),(lastkey),(flags))
++
++#define CALLREG_NAMEDBUF_SCALAR(rx,flags) \
++    CALL_FPTR((rx)->engine->named_buff_SCALAR)(aTHX_ (rx),(flags))
++
+ #define CALLREG_PACKAGE(rx) \
+     CALL_FPTR((rx)->engine->qr_package)(aTHX_ (rx))
+ 
+diff --git a/pod/perlreapi.pod b/pod/perlreapi.pod
+index 1a170ff..08ae8cd 100644
+--- a/pod/perlreapi.pod
++++ b/pod/perlreapi.pod
+@@ -26,6 +26,18 @@ structure of the following format:
+                                         const I32 paren);
+         SV*     (*named_buff_FETCH) (pTHX_ REGEXP * const rx, SV * const sv,
+                                      const U32 flags);
++        void    (*named_buff_STORE) (pTHX_ REGEXP * const rx, SV * const key,
++                                     SV * const value, const U32 flags);
++        void    (*named_buff_DELETE) (pTHX_ REGEXP * const rx,
++                                      SV * const key, const U32 flags);
++        void    (*named_buff_CLEAR) (pTHX_ REGEXP * const rx, const U32 flags);
++        bool    (*named_buff_EXISTS) (pTHX_ REGEXP * const rx,
++                                      SV * const key, const U32 flags);
++        SV*     (*named_buff_FIRSTKEY) (pTHX_ REGEXP * const rx, const U32 flags);
++        SV*     (*named_buff_NEXTKEY) (pTHX_ REGEXP * const rx,
++                                       SV * const lastkey, const U32 flags);
++        SV*     (*named_buff_SCALAR) (pTHX_ REGEXP * const rx,
++                                      const U32 flags);
+         SV*     (*qr_package)(pTHX_ REGEXP * const rx);
+     #ifdef USE_ITHREADS
+         void*   (*dupe) (pTHX_ REGEXP * const rx, CLONE_PARAMS *param);
+@@ -186,38 +198,45 @@ can release any resources pointed to by the C<pprivate> member of the
+ regexp structure. This is only responsible for freeing private data;
+ perl will handle releasing anything else contained in the regexp structure.
+ 
+-=head2 numbered_buff_FETCH
++=head2 Numbered capture callbacks
+ 
+-    void numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
+-                             SV * const sv);
+-
+-Called to get the value of C<$`>, C<$'>, C<$&> (and their named
+-equivalents, see L<perlvar>) and the numbered capture buffers (C<$1>,
+-C<$2>, ...).
++Called to get/set the value of C<$`>, C<$'>, C<$&> and their named
++equivalents, ${^PREMATCH}, ${^POSTMATCH} and $^{MATCH}, as well as the
++numbered capture buffers (C<$1>, C<$2>, ...).
+ 
+ The C<paren> paramater will be C<-2> for C<$`>, C<-1> for C<$'>, C<0>
+ for C<$&>, C<1> for C<$1> and so forth.
+ 
+-C<sv> should be set to the scalar to return, the scalar is passed as
+-an argument rather than being returned from the function because when
+-it's called perl already has a scalar to store the value, creating
+-another one would be redundant. The scalar can be set with
+-C<sv_setsv>, C<sv_setpvn> and friends, see L<perlapi>.
++The names have been chosen by analogy with L<Tie::Scalar> methods
++names with an additional B<LENGTH> callback for efficiency. However
++named capture variables are currently not tied internally but
++implemented via magic.
++
++=head3 numbered_buff_FETCH
++
++    void numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
++                             SV * const sv);
++
++Fetch a specified numbered capture. C<sv> should be set to the scalar
++to return, the scalar is passed as an argument rather than being
++returned from the function because when it's called perl already has a
++scalar to store the value, creating another one would be
++redundant. The scalar can be set with C<sv_setsv>, C<sv_setpvn> and
++friends, see L<perlapi>.
+ 
+ This callback is where perl untaints its own capture variables under
+ taint mode (see L<perlsec>). See the C<Perl_reg_numbered_buff_get>
+ function in F<regcomp.c> for how to untaint capture variables if
+ that's something you'd like your engine to do as well.
+ 
+-=head2 numbered_buff_STORE
++=head3 numbered_buff_STORE
+ 
+     void    (*numbered_buff_STORE) (pTHX_ REGEXP * const rx, const I32 paren,
+                                     SV const * const value);
+ 
+-Called to set the value of a numbered capture variable. C<paren> is
+-the paren number (see the L<mapping|/numbered_buff_FETCH> above) and
+-C<value> is the scalar that is to be used as the new value. It's up to
+-the engine to make sure this is used as the new value (or reject it).
++Set the value of a numbered capture variable. C<value> is the scalar
++that is to be used as the new value. It's up to the engine to make
++sure this is used as the new value (or reject it).
+ 
+ Example:
+ 
+@@ -262,19 +281,19 @@ behave in the same situation:
+ 
+ Because C<$sv> is C<undef> when the C<y///> operator is applied to it
+ the transliteration won't actually execute and the program won't
+-C<die>. This is different to how 5.8 behaved since the capture
+-variables were READONLY variables then, now they'll just die on
+-assignment in the default engine.
++C<die>. This is different to how 5.8 and earlier versions behaved
++since the capture variables were READONLY variables then, now they'll
++just die when assigned to in the default engine.
+ 
+-=head2 numbered_buff_LENGTH
++=head3 numbered_buff_LENGTH
+ 
+     I32 numbered_buff_LENGTH (pTHX_ REGEXP * const rx, const SV * const sv,
+                               const I32 paren);
+ 
+ Get the C<length> of a capture variable. There's a special callback
+ for this so that perl doesn't have to do a FETCH and run C<length> on
+-the result, since the length is (in perl's case) known from a memory
+-offset this is much more efficient:
++the result, since the length is (in perl's case) known from an offset
++stored in C<<rx->offs> this is much more efficient:
+ 
+     I32 s1  = rx->offs[paren].start;
+     I32 s2  = rx->offs[paren].end;
+@@ -284,14 +303,79 @@ This is a little bit more complex in the case of UTF-8, see what
+ C<Perl_reg_numbered_buff_length> does with
+ L<is_utf8_string_loclen|perlapi/is_utf8_string_loclen>.
+ 
+-=head2 named_buff_FETCH
++=head2 Named capture callbacks
++
++Called to get/set the value of C<%+> and C<%->. If C<%+> is being
++operated on C<flags & RXf_HASH_ONE> will be true and C<flags &
++RXf_HASH_ALL> will be true for C<%->. There's also an additional flag
++for the L<SCALAR|/named_buff_SCALAR> callback, see below.
++
++This is implemented with a real tied interface via
++L<Tie::Hash::NamedCapture>, its methods call back into these
++functions, the usage of L<Tie::Hash::NamedCapture> for this purpose
++might change in future releases. For instance this might be
++implemented by magic instead (would need an extension to mgvtbl).
++
++Since these functions are just C level wrappers for the interface
++described in L<Tie::Hash> their arguments and return values are as
++described there, only with C prototypes.
++
++=head3 named_buff_FETCH
+ 
+     SV* named_buff_FETCH(pTHX_ REGEXP * const rx, SV * const key,
+                           const U32 flags);
+ 
+-Called to get the value of key in the C<%+> and C<%-> hashes, C<key>
+-is the hash key being requested and if C<flags & 1> is true C<%-> is
+-being requested (and C<%+> if it's not).
++Get an entry.
++
++=head3 named_buff_STORE
++
++    void named_buff_STORE (pTHX_ REGEXP * const rx, SV * const key,
++                           SV * const value, const U32 flags);
++
++Store a value.
++
++=head3 named_buff_DELETE
++
++    void named_buff_DELETE (pTHX_ REGEXP * const rx,
++                            SV * const key, const U32 flags);
++
++Delete an entry.
++
++=head3 named_buff_CLEAR
++
++    void named_buff_CLEAR (pTHX_ REGEXP * const rx, const U32 flags);
++
++Clear the hash.
++
++=head3 named_buff_EXISTS
++
++    bool named_buff_EXISTS (pTHX_ REGEXP * const rx,
++                            SV * const key, const U32 flags);
++
++Check whether an entry C<exists>.
++
++=head3 named_buff_FIRSTKEY
++
++    SV*     (*named_buff_FIRSTKEY) (pTHX_ REGEXP * const rx, const U32 flags);
++
++Begin iterating the hash.
++
++=head3 named_buff_NEXTKEY
++
++    SV* named_buff_NEXTKEY (pTHX_ REGEXP * const rx,
++                            SV * const lastkey, const U32 flags);
++
++Get the next entry in the hash.
++
++=head3 named_buff_SCALAR
++
++    SV* named_buff_SCALAR (pTHX_ REGEXP * const rx, const U32 flags);
++
++Return what the hash evaluates to in C<scalar> context.
++
++This will also be called by L<re::regnames_count|re> to get the total
++number of named capture buffers defined for the pattern, in this case
++C<flags & RXf_HASH_COUNT> will be true.
+ 
+ =head2 qr_package
+ 
+@@ -333,7 +417,7 @@ following snippet:
+             SvTYPE(sv) == SVt_PVMG &&
+             (mg = mg_find(sv, PERL_MAGIC_qr))) /* assignment deliberate */
+         {
+-            re = (REGEXP *)mg->mg_obj; 
++            re = (REGEXP *)mg->mg_obj;
+         }
+ 
+ Or use the (CURRENTLY UNDOCUMENETED!) C<Perl_get_re_arg> function:
+@@ -448,8 +532,9 @@ TODO, see L<http://www.mail-archive.com/perl5-changes@perl.org/msg17328.html>
+ 
+ =head2 C<extflags>
+ 
+-This will be used by perl to see what flags the regexp was compiled with, this
+-will normally be set to the value of the flags parameter on L</comp>.
++This will be used by perl to see what flags the regexp was compiled
++with, this will normally be set to the value of the flags parameter by
++the L<comp|/comp> callback.
+ 
+ =head2 C<minlen> C<minlenret>
+ 
+@@ -479,7 +564,9 @@ Left offset from pos() to start match at.
+ 
+ =head2 C<substrs>
+ 
+-TODO: document
++Substring data about strings that must appear in the final match. This
++is currently only used internally by perl's engine for but might be
++used in the future for all engines for optimisations like C<minlen>.
+ 
+ =head2 C<nparens>, C<lasparen>, and C<lastcloseparen>
+ 
+@@ -490,7 +577,7 @@ the last close paren to be entered.
+ =head2 C<intflags>
+ 
+ The engine's private copy of the flags the pattern was compiled with. Usually
+-this is the same as C<extflags> unless the engine chose to modify one of them
++this is the same as C<extflags> unless the engine chose to modify one of them.
+ 
+ =head2 C<pprivate>
+ 
+@@ -520,8 +607,18 @@ C<$paren >= 1>.
+ 
+ =head2 C<precomp> C<prelen>
+ 
+-Used for debugging purposes. C<precomp> holds a copy of the pattern
+-that was compiled and C<prelen> its length.
++Used for optimisations. C<precomp> holds a copy of the pattern that
++was compiled and C<prelen> its length. When a new pattern is to be
++compiled (such as inside a loop) the internal C<regcomp> operator
++checks whether the last compiled C<REGEXP>'s C<precomp> and C<prelen>
++are equivalent to the new one, and if so uses the old pattern instead
++of compiling a new one.
++
++The relevant snippet from C<Perl_pp_regcomp>:
++
++	if (!re || !re->precomp || re->prelen != (I32)len ||
++	    memNE(re->precomp, t, len))
++        /* Compile a new pattern */
+ 
+ =head2 C<paren_names>
+ 
+@@ -563,11 +660,11 @@ inline modifiers it's best to have C<qr//> stringify to the supplied pattern,
+ note that this will create invalid patterns in cases such as:
+ 
+     my $x = qr/a|b/;  # "a|b"
+-    my $y = qr/c/;    # "c"
++    my $y = qr/c/i;   # "c"
+     my $z = qr/$x$y/; # "a|bc"
+ 
+-There's no solution for such problems other than making the custom engine
+-understand some for of inline modifiers.
++There's no solution for this problem other than making the custom
++engine understand a construct like C<(?:)>.
+ 
+ The C<Perl_reg_stringify> in F<regcomp.c> does the stringification work.
+ 
+diff --git a/proto.h b/proto.h
+index dee615f..02b24d5 100644
+--- a/proto.h
++++ b/proto.h
+@@ -1893,10 +1893,36 @@ PERL_CALLCONV regnode*	Perl_regnext(pTHX_ regnode* p)
+ 			__attribute__nonnull__(pTHX_1);
+ 
+ 
+-PERL_CALLCONV SV*	Perl_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const key, const U32 flags)
++PERL_CALLCONV SV*	Perl_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const namesv, const U32 flags)
+ 			__attribute__nonnull__(pTHX_1)
+ 			__attribute__nonnull__(pTHX_2);
+ 
++PERL_CALLCONV void	Perl_reg_named_buff_store(pTHX_ REGEXP * const rx, SV * const key, SV * const value, const U32 flags)
++			__attribute__nonnull__(pTHX_1)
++			__attribute__nonnull__(pTHX_2)
++			__attribute__nonnull__(pTHX_3);
++
++PERL_CALLCONV void	Perl_reg_named_buff_delete(pTHX_ REGEXP * const rx, SV * const key, const U32 flags)
++			__attribute__nonnull__(pTHX_1)
++			__attribute__nonnull__(pTHX_2);
++
++PERL_CALLCONV void	Perl_reg_named_buff_clear(pTHX_ REGEXP * const rx, const U32 flags)
++			__attribute__nonnull__(pTHX_1);
++
++PERL_CALLCONV bool	Perl_reg_named_buff_exists(pTHX_ REGEXP * const rx, SV * const key, const U32 flags)
++			__attribute__nonnull__(pTHX_1)
++			__attribute__nonnull__(pTHX_2);
++
++PERL_CALLCONV SV*	Perl_reg_named_buff_firstkey(pTHX_ REGEXP * const rx, const U32 flags)
++			__attribute__nonnull__(pTHX_1);
++
++PERL_CALLCONV SV*	Perl_reg_named_buff_nextkey(pTHX_ REGEXP * const rx, SV * const lastkey, const U32 flags)
++			__attribute__nonnull__(pTHX_1)
++			__attribute__nonnull__(pTHX_2);
++
++PERL_CALLCONV SV*	Perl_reg_named_buff_scalar(pTHX_ REGEXP * const rx, const U32 flags)
++			__attribute__nonnull__(pTHX_1);
++
+ 
+ PERL_CALLCONV void	Perl_reg_numbered_buff_fetch(pTHX_ REGEXP * const rx, const I32 paren, SV * const sv)
+ 			__attribute__nonnull__(pTHX_1);
+diff --git a/regcomp.c b/regcomp.c
+index baa5d99..c144d76 100644
+--- a/regcomp.c
++++ b/regcomp.c
+@@ -228,7 +228,7 @@ typedef struct RExC_state_t {
+   
+     /FOO[xX]A.*B[xX]BAR/
+     
+-  Both 'FOO' and 'A' are fixed strings. Both 'B' and 'BAR' are floating
++v  Both 'FOO' and 'A' are fixed strings. Both 'B' and 'BAR' are floating
+   strings (because they follow a .* construct). study_chunk will identify
+   both FOO and BAR as being the longest fixed and floating strings respectively.
+   
+@@ -4800,7 +4800,7 @@ Perl_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const namesv, const U32
+ {
+     AV *retarray = NULL;
+     SV *ret;
+-    if (flags & 1) 
++    if (flags & RXf_HASH_ALL)
+         retarray=newAV();
+ 
+     if (rx && rx->paren_names) {
+@@ -4810,9 +4810,9 @@ Perl_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const namesv, const U32
+             SV* sv_dat=HeVAL(he_str);
+             I32 *nums=(I32*)SvPVX(sv_dat);
+             for ( i=0; i<SvIVX(sv_dat); i++ ) {
+-		if ((I32)(rx->nparens) >= nums[i]
+-			&& rx->offs[nums[i]].start != -1
+-			&& rx->offs[nums[i]].end != -1)
++                if ((I32)(rx->nparens) >= nums[i]
++                    && rx->offs[nums[i]].start != -1
++                    && rx->offs[nums[i]].end != -1)
+                 {
+                     ret = newSVpvs("");
+                     CALLREG_NUMBUF_FETCH(rx,nums[i],ret);
+@@ -4827,13 +4827,116 @@ Perl_reg_named_buff_fetch(pTHX_ REGEXP * const rx, SV * const namesv, const U32
+                 }
+             }
+             if (retarray)
+-                return (SV*)retarray;
++                return newRV((SV*)retarray);
+         }
+     }
+     return NULL;
+ }
+ 
+ void
++Perl_reg_named_buff_store(pTHX_ REGEXP * const rx, SV * const key,
++                          SV * const value, const U32 flags)
++{
++    PERL_UNUSED_ARG(rx);
++    PERL_UNUSED_ARG(key);
++    PERL_UNUSED_ARG(value);
++    PERL_UNUSED_ARG(flags);
++
++    Perl_croak(aTHX_ PL_no_modify);
++}
++
++void
++Perl_reg_named_buff_delete(pTHX_ REGEXP * const rx, SV * const key, const U32 flags)
++{
++    PERL_UNUSED_ARG(rx);
++    PERL_UNUSED_ARG(key);
++    PERL_UNUSED_ARG(flags);
++
++    Perl_croak(aTHX_ PL_no_modify);
++}
++
++void
++Perl_reg_named_buff_clear(pTHX_ REGEXP * const rx, const U32 flags)
++{
++    PERL_UNUSED_ARG(rx);
++    PERL_UNUSED_ARG(flags);
++
++    Perl_croak(aTHX_ PL_no_modify);
++}
++
++bool
++Perl_reg_named_buff_exists(pTHX_ REGEXP * const rx, SV * const key,
++                           const U32 flags)
++{
++    PERL_UNUSED_ARG(flags);
++
++    if (rx && rx->paren_names) {
++        return hv_exists_ent(rx->paren_names, key, 0);
++    } else {
++        return FALSE;
++    }
++}
++
++SV*
++Perl_reg_named_buff_firstkey(pTHX_ REGEXP * const rx, const U32 flags)
++{
++    PERL_UNUSED_ARG(flags);
++
++    (void)hv_iterinit(rx->paren_names);
++
++    return CALLREG_NAMEDBUF_NEXTKEY(rx, NULL, flags);
++}
++
++SV*
++Perl_reg_named_buff_nextkey(pTHX_ REGEXP * const rx, SV * const lastkey,
++                            const U32 flags)
++{
++    PERL_UNUSED_ARG(lastkey);
++    bool all = flags & RXf_HASH_ALL;
++
++    if (rx && rx->paren_names) {
++        HV *hv= rx->paren_names;
++        while (1) {
++            HE *temphe = hv_iternext_flags(hv,0);
++            if (temphe) {
++                IV i;
++                IV parno = 0;
++                SV* sv_dat = HeVAL(temphe);
++                I32 *nums = (I32*)SvPVX(sv_dat);
++                for ( i = 0; i < SvIVX(sv_dat); i++ ) {
++                    if ((I32)(rx->lastcloseparen) >= nums[i] &&
++                        rx->offs[nums[i]].start != -1 &&
++                        rx->offs[nums[i]].end != -1)
++                    {
++                        parno = nums[i];
++                        break;
++                    }
++                }
++                if (parno || all) {
++                    STRLEN len;
++                    char *pv = HePV(temphe, len);
++                    return newSVpvn(pv,len);
++                }
++            } else {
++                break;
++            }
++        }
++    }
++
++    return NULL;
++}
++
++SV*
++Perl_reg_named_buff_scalar(pTHX_ REGEXP * const rx, const U32 flags)
++{
++    PERL_UNUSED_ARG(flags);
++
++    if (rx && rx->paren_names)
++        return newSViv(HvTOTALKEYS(rx->paren_names));
++	return &PL_sv_undef;
++}
++
++void
+ Perl_reg_numbered_buff_fetch(pTHX_ REGEXP * const rx, const I32 paren, SV * const sv)
+ {
+     char *s = NULL;
+@@ -4845,13 +4948,13 @@ Perl_reg_numbered_buff_fetch(pTHX_ REGEXP * const rx, const I32 paren, SV * cons
+         return;
+     } 
+     else               
+-    if (paren == -2 && rx->offs[0].start != -1) {
++    if (paren == RXrf_PREMATCH && rx->offs[0].start != -1) {
+         /* $` */
+ 	i = rx->offs[0].start;
+ 	s = rx->subbeg;
+     }
+     else 
+-    if (paren == -1 && rx->offs[0].end != -1) {
++    if (paren == RXrf_POSTMATCH && rx->offs[0].end != -1) {
+         /* $' */
+ 	s = rx->subbeg + rx->offs[0].end;
+ 	i = rx->sublen - rx->offs[0].end;
+@@ -4929,7 +5032,8 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const rx, const SV * const sv,
+ 
+     /* Some of this code was originally in C<Perl_magic_len> in F<mg.c> */
+ 	switch (paren) {
+-      case -2: /* $` */
++      /* $` / ${^PREMATCH} */
++      case RXrf_PREMATCH:
+         if (rx->offs[0].start != -1) {
+ 			i = rx->offs[0].start;
+ 			if (i > 0) {
+@@ -4939,7 +5043,8 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const rx, const SV * const sv,
+ 			}
+ 	    }
+         return 0;
+-      case -1: /* $' */
++      /* $' / ${^POSTMATCH} */
++      case RXrf_POSTMATCH:
+ 	    if (rx->offs[0].end != -1) {
+ 			i = rx->sublen - rx->offs[0].end;
+ 			if (i > 0) {
+@@ -4949,7 +5054,8 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const rx, const SV * const sv,
+ 			}
+ 	    }
+         return 0;
+-      default: /* $&, $1, $2, ... */
++      /* $& / ${^MATCH}, $1, $2, ... */
++      default:
+ 	    if (paren <= (I32)rx->nparens &&
+             (s1 = rx->offs[paren].start) != -1 &&
+             (t1 = rx->offs[paren].end) != -1)
+diff --git a/regcomp.h b/regcomp.h
+index 33c3eef..5be7f32 100644
+--- a/regcomp.h
++++ b/regcomp.h
+@@ -473,6 +473,13 @@ EXTCONST regexp_engine PL_core_reg_engine = {
+         Perl_reg_numbered_buff_store,
+         Perl_reg_numbered_buff_length,
+         Perl_reg_named_buff_fetch,
++        Perl_reg_named_buff_store,
++        Perl_reg_named_buff_delete,
++        Perl_reg_named_buff_clear,
++        Perl_reg_named_buff_exists,
++        Perl_reg_named_buff_firstkey,
++        Perl_reg_named_buff_nextkey,
++        Perl_reg_named_buff_scalar,
+         Perl_reg_qr_package,
+ #if defined(USE_ITHREADS)        
+         Perl_regdupe_internal
+diff --git a/regexp.h b/regexp.h
+index 1f72112..31d264d 100644
+--- a/regexp.h
++++ b/regexp.h
+@@ -136,14 +136,40 @@ typedef struct regexp_engine {
+                                    SV const * const value);
+     I32     (*numbered_buff_LENGTH) (pTHX_ REGEXP * const rx, const SV * const sv,
+                                     const I32 paren);
+-    SV*     (*named_buff_FETCH) (pTHX_ REGEXP * const rx, SV * const key,
++    SV*     (*named_buff_FETCH) (pTHX_ REGEXP * const rx, SV * const sv,
+                                  const U32 flags);
++    void    (*named_buff_STORE) (pTHX_ REGEXP * const rx, SV * const key,
++                                 SV * const value, const U32 flags);
++    void    (*named_buff_DELETE) (pTHX_ REGEXP * const rx,
++                                  SV * const key, const U32 flags);
++    void    (*named_buff_CLEAR) (pTHX_ REGEXP * const rx, const U32 flags);
++    bool    (*named_buff_EXISTS) (pTHX_ REGEXP * const rx,
++                                  SV * const key, const U32 flags);
++    SV*     (*named_buff_FIRSTKEY) (pTHX_ REGEXP * const rx, const U32 flags);
++    SV*     (*named_buff_NEXTKEY) (pTHX_ REGEXP * const rx,
++                                   SV * const lastkey, const U32 flags);
++    SV*     (*named_buff_SCALAR) (pTHX_ REGEXP * const rx,
++                                  const U32 flags);
+     SV*     (*qr_package)(pTHX_ REGEXP * const rx);
+ #ifdef USE_ITHREADS
+     void*   (*dupe) (pTHX_ REGEXP * const rx, CLONE_PARAMS *param);
+ #endif
+ } regexp_engine;
+ 
++/*
++  These are passed to the numbered capture variable callbacks as the
++  paren name. >= 1 is reserved for actual numbered captures, i.e. $1,
++  $2 etc.
++*/
++
++#define RXrf_PREMATCH  -2 /* $` / ${^PREMATCH}  */
++#define RXrf_POSTMATCH -1 /* $' / ${^POSTMATCH} */
++#define RXrf_MATCH      0 /* $& / ${^MATCH}     */
++
++#define RXf_HASH_ONE      0x00000001 /* %+ */
++#define RXf_HASH_ALL      0x00000002 /* %- */
++#define RXf_HASH_COUNT    0x00000004 /* scalar %+ / scalar %- */
++
+ /* Flags stored in regexp->extflags 
+  * These are used by code external to the regexp engine
+  *
+diff --git a/t/TEST b/t/TEST
+old mode 100644
+new mode 100755
+diff --git a/t/op/readdir.t b/t/op/readdir.t
+index c4d5ed2..971a02a 100644
+--- a/t/op/readdir.t
++++ b/t/op/readdir.t
+@@ -24,7 +24,7 @@ closedir(OP);
+ ## This range will have to adjust as the number of tests expands,
+ ## as it's counting the number of .t files in src/t
+ ##
+-my ($min, $max) = (140, 160);
++my ($min, $max) = (150, 170);
+ if (@D > $min && @D < $max) { print "ok 2\n"; }
+ else {
+     printf "not ok 2 # counting op/*.t, expect $min < %d < $max files\n",
+diff --git a/t/op/regexp_namedcapture_tie.t b/t/op/regexp_namedcapture_tie.t
+new file mode 100644
+index 0000000..f72970e
+--- /dev/null
++++ b/t/op/regexp_namedcapture_tie.t
+@@ -0,0 +1,48 @@
++#!./perl
++
++BEGIN {
++    chdir 't' if -d 't';
++    @INC = '../lib';
++    require './test.pl';
++}
++
++# Do a basic test on all the tied methods of Tie::Hash::NamedCapture
++
++print "1..12\n";
++
++"hlagh" =~ /
++    (?<a>.)
++    (?<b>.)
++    (?<a>.)
++    .*
++    (?<e>$)
++/x;
++
++# FETCH
++is($+{a}, "h", "FETCH");
++is($+{b}, "l", "FETCH");
++is($-{a}[0], "h", "FETCH");
++is($-{a}[1], "a", "FETCH");
++
++# STORE
++eval { $+{a} = "yon" };
++ok(index($@, "read-only") != -1, "STORE");
++
++# DELETE
++eval { delete $+{a} };
++ok(index($@, "read-only") != -1, "DELETE");
++
++# CLEAR
++eval { %+ = () };
++ok(index($@, "read-only") != -1, "CLEAR");
++
++# EXISTS
++ok(exists $+{e}, "EXISTS");
++ok(!exists $+{d}, "EXISTS");
++
++# FIRSTKEY/NEXTKEY
++is(join('|', sort keys %+), "a|b|e", "FIRSTKEY/NEXTKEY");
++
++# SCALAR
++is(scalar(%+), 3, "SCALAR");
++is(scalar(%-), 3, "SCALAR");
+diff --git a/universal.c b/universal.c
+index 396dd3d..f506441 100644
+--- a/universal.c
++++ b/universal.c
+@@ -16,6 +16,11 @@
+ 
+ /* This file contains the code that implements the functions in Perl's
+  * UNIVERSAL package, such as UNIVERSAL->can().
++ *
++ * It is also used to store XS functions that need to be present in
++ * miniperl for a lack of a better place to put them. It might be
++ * clever to move them to seperate XS files which would then be pulled
++ * in by some to-be-written build process.
+  */
+ 
+ #include "EXTERN.h"
+@@ -226,11 +231,17 @@ XS(XS_Internals_rehash_seed);
+ XS(XS_Internals_HvREHASH);
+ XS(XS_Internals_inc_sub_generation);
+ XS(XS_re_is_regexp); 
+-XS(XS_re_regname); 
+-XS(XS_re_regnames); 
+-XS(XS_re_regnames_iterinit);
+-XS(XS_re_regnames_iternext);
++XS(XS_re_regname);
++XS(XS_re_regnames);
+ XS(XS_re_regnames_count);
++XS(XS_Tie_Hash_NamedCapture_FETCH);
++XS(XS_Tie_Hash_NamedCapture_STORE);
++XS(XS_Tie_Hash_NamedCapture_DELETE);
++XS(XS_Tie_Hash_NamedCapture_CLEAR);
++XS(XS_Tie_Hash_NamedCapture_EXISTS);
++XS(XS_Tie_Hash_NamedCapture_FIRSTKEY);
++XS(XS_Tie_Hash_NamedCapture_NEXTKEY);
++XS(XS_Tie_Hash_NamedCapture_SCALAR);
+ 
+ void
+ Perl_boot_core_UNIVERSAL(pTHX)
+@@ -284,9 +295,15 @@ Perl_boot_core_UNIVERSAL(pTHX)
+     newXSproto("re::is_regexp", XS_re_is_regexp, file, "$");
+     newXSproto("re::regname", XS_re_regname, file, ";$$");
+     newXSproto("re::regnames", XS_re_regnames, file, ";$");
+-    newXSproto("re::regnames_iterinit", XS_re_regnames_iterinit, file, "");
+-    newXSproto("re::regnames_iternext", XS_re_regnames_iternext, file, ";$");
+     newXSproto("re::regnames_count", XS_re_regnames_count, file, "");
++    newXS("Tie::Hash::NamedCapture::FETCH", XS_Tie_Hash_NamedCapture_FETCH, file);
++    newXS("Tie::Hash::NamedCapture::STORE", XS_Tie_Hash_NamedCapture_STORE, file);
++    newXS("Tie::Hash::NamedCapture::DELETE", XS_Tie_Hash_NamedCapture_DELETE, file);
++    newXS("Tie::Hash::NamedCapture::CLEAR", XS_Tie_Hash_NamedCapture_CLEAR, file);
++    newXS("Tie::Hash::NamedCapture::EXISTS", XS_Tie_Hash_NamedCapture_EXISTS, file);
++    newXS("Tie::Hash::NamedCapture::FIRSTKEY", XS_Tie_Hash_NamedCapture_FIRSTKEY, file);
++    newXS("Tie::Hash::NamedCapture::NEXTKEY", XS_Tie_Hash_NamedCapture_NEXTKEY, file);
++    newXS("Tie::Hash::NamedCapture::SCALAR", XS_Tie_Hash_NamedCapture_SCALAR, file);
+ }
+ 
+ 
+@@ -1072,206 +1089,341 @@ XS(XS_re_is_regexp)
+         /* NOTREACHED */        
+ 	PUTBACK;
+ 	return;
++
+     }
+ }
+ 
+-XS(XS_re_regname)
++XS(XS_re_regnames_count)
+ {
+-
++    REGEXP *rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    SV *ret;
+     dVAR; 
+     dXSARGS;
++
++    if (items != 0)
++       Perl_croak(aTHX_ "Usage: %s(%s)", "re::regnames_count", "");
++    PERL_UNUSED_VAR(cv); /* -W */
++    PERL_UNUSED_VAR(ax); /* -Wall */
++    SP -= items;
++
++    if (!rx)
++        XSRETURN_UNDEF;
++
++    ret = CALLREG_NAMEDBUF_SCALAR(rx, RXf_HASH_COUNT);
++
++    SPAGAIN;
++
++    if (ret) {
++        XPUSHs(ret);
++        PUTBACK;
++        return;
++    } else {
++        XSRETURN_UNDEF;
++    }
++}
++
++XS(XS_re_regname)
++{
++    dVAR;
++    dXSARGS;
+     if (items < 1 || items > 2)
+-       Perl_croak(aTHX_ "Usage: %s(%s)", "re::regname", "name[, all ]");
++        Perl_croak(aTHX_ "Usage: %s(%s)", "re::regname", "name[, all ]");
+     PERL_UNUSED_VAR(cv); /* -W */
+     PERL_UNUSED_VAR(ax); /* -Wall */
+     SP -= items;
+-    {
+-	SV *	sv = ST(0);
+-	SV *	all;
+-        regexp *re = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
+-        SV *bufs = NULL;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    SV * ret;
+ 
+-	if (items < 2)
+-	    all = NULL;
+-	else {
+-	    all = ST(1);
+-	}
+-        {
+-            if (SvPOK(sv) && re && re->paren_names) {
+-                bufs = CALLREG_NAMEDBUF_FETCH(re,sv,all && SvTRUE(all));
+-                if (bufs) {
+-                    if (all && SvTRUE(all))
+-                        XPUSHs(newRV(bufs));
+-                    else
+-                        XPUSHs(SvREFCNT_inc(bufs));
+-                    XSRETURN(1);
+-                }
+-            }
+-            XSRETURN_UNDEF;
+-        }
+-	PUTBACK;
+-	return;
++    if (!rx)
++        XSRETURN_UNDEF;
++
++    if (items == 2 && SvTRUE(ST(1))) {
++        flags = RXf_HASH_ALL;
++    } else {
++        flags = RXf_HASH_ONE;
++    }
++    ret = CALLREG_NAMEDBUF_FETCH(rx, ST(0), flags);
++
++    if (ret) {
++        if (SvROK(ret))
++            XPUSHs(ret);
++        else
++            XPUSHs(SvREFCNT_inc(ret));
++        XSRETURN(1);
+     }
++    XSRETURN_UNDEF;    
+ }
+ 
++
+ XS(XS_re_regnames)
+ {
+-    dVAR; 
++    dVAR;
+     dXSARGS;
+     if (items < 0 || items > 1)
+-       Perl_croak(aTHX_ "Usage: %s(%s)", "re::regnames", "[all]");
++        Perl_croak(aTHX_ "Usage: %s(%s)", "re::regnames", "[all]");
+     PERL_UNUSED_VAR(cv); /* -W */
+     PERL_UNUSED_VAR(ax); /* -Wall */
+     SP -= items;
+-    {
+-	SV *	all;
+-        regexp *re = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
+-        IV count = 0;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    IV count = 0;
+ 
+-	if (items < 1)
+-	    all = NULL;
+-	else {
+-	    all = ST(0);
+-	}
+-        {
+-            if (re && re->paren_names) {
+-                HV *hv= re->paren_names;
+-                (void)hv_iterinit(hv);
+-                while (1) {
+-                    HE *temphe = hv_iternext_flags(hv,0);
+-                    if (temphe) {
+-                        IV i;
+-                        IV parno = 0;
+-                        SV* sv_dat = HeVAL(temphe);
+-                        I32 *nums = (I32*)SvPVX(sv_dat);
+-                        for ( i = 0; i < SvIVX(sv_dat); i++ ) {
+-                            if ((I32)(re->lastcloseparen) >= nums[i] &&
+-                                re->offs[nums[i]].start != -1 &&
+-                                re->offs[nums[i]].end != -1)
+-                            {
+-                                parno = nums[i];
+-                                break;
+-                            }
+-                        }
+-                        if (parno || (all && SvTRUE(all))) {
+-                            STRLEN len;
+-                            char *pv = HePV(temphe, len);
+-                            if ( GIMME_V == G_ARRAY ) 
+-                                XPUSHs(newSVpvn(pv,len));
+-                            count++;
+-                        }
+-                    } else {
++    if (!rx)
++        XSRETURN_UNDEF;
++
++    if (items == 1 && SvTRUE(ST(0))) {
++        flags = 1;
++    } else {
++        flags = 0;
++    }
++
++    if (rx && rx->paren_names) {
++        HV *hv= rx->paren_names;
++        (void)hv_iterinit(hv);
++        while (1) {
++            HE *temphe = hv_iternext_flags(hv,0);
++            if (temphe) {
++                IV i;
++                IV parno = 0;
++                SV* sv_dat = HeVAL(temphe);
++                I32 *nums = (I32*)SvPVX(sv_dat);
++                for ( i = 0; i < SvIVX(sv_dat); i++ ) {
++                    if ((I32)(rx->lastcloseparen) >= nums[i] &&
++                        rx->offs[nums[i]].start != -1 &&
++                        rx->offs[nums[i]].end != -1)
++                    {
++                        parno = nums[i];
+                         break;
+                     }
+                 }
++                if (parno || flags) {
++                    STRLEN len;
++                    char *pv = HePV(temphe, len);
++                    if ( GIMME_V == G_ARRAY ) 
++                        XPUSHs(newSVpvn(pv,len));
++                    count++;
++                }
++            } else {
++                break;
+             }
+-            if ( GIMME_V == G_ARRAY ) 
+-                XSRETURN(count);
+-            else 
+-                XSRETURN_UNDEF;
+-        }    
+-	PUTBACK;
+-	return;
++        }
+     }
++    
++    if ( GIMME_V == G_ARRAY )
++        XSRETURN(count);
++    else 
++        XSRETURN_UNDEF;
+ }
+ 
+-
+-XS(XS_re_regnames_iterinit)
++XS(XS_Tie_Hash_NamedCapture_FETCH)
+ {
+-    dVAR; 
++    dVAR;
+     dXSARGS;
+-    if (items != 0)
+-	Perl_croak(aTHX_ "Usage: re::regnames_iterinit()");
+-    PERL_UNUSED_VAR(cv); /* -W */
+-    PERL_UNUSED_VAR(ax); /* -Wall */
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    SV * ret;
++
++    if (items != 2)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::STORE($key, $flags)");
++
++    if (!rx)
++        XSRETURN_UNDEF;
++
+     SP -= items;
+-    {
+-        regexp *re = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
+-        if (re && re->paren_names) {
+-            (void)hv_iterinit(re->paren_names);
+-            XPUSHs(newSViv(HvTOTALKEYS(re->paren_names)));
+-        } else {
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    ret = CALLREG_NAMEDBUF_FETCH(rx, ST(1), flags);
++
++    SPAGAIN;
++
++    if (ret) {
++        if (SvROK(ret))
++            XPUSHs(ret);
++        else
++            XPUSHs(SvREFCNT_inc(ret));
++        PUTBACK;
++        return;
++    }
++    XSRETURN_UNDEF;
++}
++
++XS(XS_Tie_Hash_NamedCapture_STORE)
++{
++    dVAR;
++    dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++
++    if (items != 3)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::STORE($key, $value, $flags)");
++
++    if (!rx) {
++        if (!PL_localizing)
++            Perl_croak(aTHX_ PL_no_modify);
++        else
+             XSRETURN_UNDEF;
+-        }  
+-	PUTBACK;
+-	return;
+     }
++
++    SP -= items;
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    CALLREG_NAMEDBUF_STORE(rx,ST(1), ST(2), flags);
+ }
+ 
++XS(XS_Tie_Hash_NamedCapture_DELETE)
++{
++    dVAR;
++    dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
+ 
+-XS(XS_re_regnames_iternext)
++    if (items != 2)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::DELETE($key, $flags)");
++
++    if (!rx)
++        Perl_croak(aTHX_ PL_no_modify);
++
++    SP -= items;
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    CALLREG_NAMEDBUF_DELETE(rx, ST(1), flags);
++}
++
++XS(XS_Tie_Hash_NamedCapture_CLEAR)
+ {
+-    dVAR; 
++    dVAR;
+     dXSARGS;
+-    if (items < 0 || items > 1)
+-       Perl_croak(aTHX_ "Usage: %s(%s)", "re::regnames_iternext", "[all]");
+-    PERL_UNUSED_VAR(cv); /* -W */
+-    PERL_UNUSED_VAR(ax); /* -Wall */
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++
++    if (items != 1)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::CLEAR($flags)");
++
++    if (!rx)
++        Perl_croak(aTHX_ PL_no_modify);
++
+     SP -= items;
+-    {
+-	SV *	all;
+-        regexp *re = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
+ 
+-	if (items < 1)
+-	    all = NULL;
+-	else {
+-	    all = ST(0);
+-	}
+-        if (re && re->paren_names) {
+-            HV *hv= re->paren_names;
+-            while (1) {
+-                HE *temphe = hv_iternext_flags(hv,0);
+-                if (temphe) {
+-                    IV i;
+-                    IV parno = 0;
+-                    SV* sv_dat = HeVAL(temphe);
+-                    I32 *nums = (I32*)SvPVX(sv_dat);
+-                    for ( i = 0; i < SvIVX(sv_dat); i++ ) {
+-                        if ((I32)(re->lastcloseparen) >= nums[i] &&
+-                            re->offs[nums[i]].start != -1 &&
+-                            re->offs[nums[i]].end != -1)
+-                        {
+-                            parno = nums[i];
+-                            break;
+-                        }
+-                    }
+-                    if (parno || (all && SvTRUE(all))) {
+-                        STRLEN len;
+-                        char *pv = HePV(temphe, len);
+-                        XPUSHs(newSVpvn(pv,len));
+-                        XSRETURN(1);    
+-                    }
+-                } else {
+-                    break;
+-                }
+-            }
+-        }
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    CALLREG_NAMEDBUF_CLEAR(rx, flags);
++}
++
++XS(XS_Tie_Hash_NamedCapture_EXISTS)
++{
++    dVAR;
++    dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    bool exists;
++
++    if (items != 2)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::EXISTS($key, $flags)");
++
++    if (!rx)
+         XSRETURN_UNDEF;
+-	PUTBACK;
+-	return;
++
++    SP -= items;
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    exists = CALLREG_NAMEDBUF_EXISTS(rx, ST(1), flags);
++
++    SPAGAIN;
++
++    if (exists) {
++        XSRETURN_YES;
++    } else {
++        XSRETURN_NO;
+     }
+ }
+ 
++XS(XS_Tie_Hash_NamedCapture_FIRSTKEY)
++{
++    dVAR;
++    dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    SV * ret;
+ 
+-XS(XS_re_regnames_count)
++    if (items != 1)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::FIRSTKEY()");
++
++    if (!rx)
++        XSRETURN_UNDEF;
++
++    SP -= items;
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    ret = CALLREG_NAMEDBUF_FIRSTKEY(rx, flags);
++
++    SPAGAIN;
++
++    if (ret) {
++        XPUSHs(SvREFCNT_inc(ret));
++        PUTBACK;
++    } else {
++        XSRETURN_UNDEF;
++    }
++
++}
++
++XS(XS_Tie_Hash_NamedCapture_NEXTKEY)
+ {
+-    regexp *re = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
+-    dVAR; 
++    dVAR;
+     dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    SV * ret;
++
++    if (items != 2)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::NEXTKEY($lastkey)");
++
++    if (!rx)
++        XSRETURN_UNDEF;
+ 
+-    if (items != 0)
+-       Perl_croak(aTHX_ "Usage: %s(%s)", "re::regnames_count", "");
+-    PERL_UNUSED_VAR(cv); /* -W */
+-    PERL_UNUSED_VAR(ax); /* -Wall */
+     SP -= items;
+-    
+-    if (re && re->paren_names) {
+-        XPUSHs(newSViv(HvTOTALKEYS(re->paren_names)));
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    ret = CALLREG_NAMEDBUF_NEXTKEY(rx, ST(1), flags);
++
++    SPAGAIN;
++
++    if (ret) {
++        XPUSHs(ret);
+     } else {
+         XSRETURN_UNDEF;
+     }  
+     PUTBACK;
+-    return;
++}
++
++XS(XS_Tie_Hash_NamedCapture_SCALAR)
++{
++    dVAR;
++    dXSARGS;
++    REGEXP * rx = PL_curpm ? PM_GETRE(PL_curpm) : NULL;
++    U32 flags;
++    SV * ret;
++
++    if (items != 1)
++        Perl_croak(aTHX_ "Usage: Tie::Hash::NamedCapture::SCALAR()");
++
++    if (!rx)
++        XSRETURN_UNDEF;
++
++    SP -= items;
++
++    flags = (U32)INT2PTR(IV,SvIV(SvRV((SV*)ST(0))));
++    ret = CALLREG_NAMEDBUF_SCALAR(rx, flags);
++
++    SPAGAIN;
++
++    if (ret) {
++        XPUSHs(ret);
++        PUTBACK;
++        return;
++    } else {
++        XSRETURN_UNDEF;
++    }
+ }
+ 
+ 

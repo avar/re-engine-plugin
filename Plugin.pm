@@ -5,7 +5,7 @@ use base 'Regexp';
 use strict;
 use XSLoader ();
 
-our $VERSION = '0.03';
+our $VERSION = '0.04_01';
 
 XSLoader::load __PACKAGE__, $VERSION;
 
@@ -26,7 +26,7 @@ sub import
     my ($pkg, %sub) = @_;
 
     # Valid callbacks
-    my @callback = qw(comp exec intuit checkstr free dupe);
+    my @callback = qw(comp exec); #intuit checkstr free dupe);
 
     for (@callback) {
         next unless exists $sub{$_};
@@ -79,6 +79,17 @@ sub num_captures
     for my $key (keys %callback) {
         $key =~ y/a-z/A-Z/; # ASCII uc
         my $name = '_num_capture_buff_' . $key;
+        $re->$name( $callback{$key} );
+    }
+}
+
+sub named_captures
+{
+    my ($re, %callback) = @_;
+
+    for my $key (keys %callback) {
+        $key =~ y/a-z/A-Z/; # ASCII uc
+        my $name = '_named_capture_buff_' . $key;
         $re->$name( $callback{$key} );
     }
 }
