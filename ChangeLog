@@ -11,7 +11,6 @@
 	* t/methods/str/types.t: This was testing pattern types, fixed
 	* t/Example.[t|pm]: Moved to t/usage
 
-
 2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.03)
 
 	* Plugin.xs: The exec callback would call_sv on a NULL value
