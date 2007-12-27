@@ -1,4 +1,3 @@
-
 #define GET_SELF_FROM_PPRIVATE(pprivate)        \
     re__engine__Plugin self;                    \
     SELF_FROM_PPRIVATE(self,pprivate);
@@ -28,22 +27,10 @@ EXTERN_C void     Plugin_numbered_buff_STORE(pTHX_ REGEXP * const,
                                              const I32, SV const * const);
 EXTERN_C I32      Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const,
                                               const SV * const, const I32);
-EXTERN_C SV *     Plugin_named_buff_FETCH(pTHX_ REGEXP * const, SV * const,
+EXTERN_C SV *     Plugin_named_buff (pTHX_ REGEXP * const, SV * const,
+                                     SV * const, const U32);
+EXTERN_C SV *     Plugin_named_buff_iter (pTHX_ REGEXP * const, const SV * const,
                                           const U32);
-EXTERN_C void     Plugin_named_buff_STORE(pTHX_ REGEXP * const rx,
-                                          SV * const key, SV * const value,
-                                          const U32 flags);
-EXTERN_C void     Plugin_named_buff_DELETE(pTHX_ REGEXP * const rx,
-                                           SV * const key, const U32 flags);
-EXTERN_C void     Plugin_named_buff_CLEAR (pTHX_ REGEXP * const rx, const U32 flags);
-EXTERN_C bool     Plugin_named_buff_EXISTS (pTHX_ REGEXP * const rx,
-                                            SV * const key, const U32 flags);
-EXTERN_C SV *     Plugin_named_buff_FIRSTKEY (pTHX_ REGEXP * const rx,
-                                              const U32 flags);
-EXTERN_C SV *     Plugin_named_buff_NEXTKEY (pTHX_ REGEXP * const rx,
-                                             SV * const lastkey, const U32 flags);
-EXTERN_C SV *     Plugin_named_buff_SCALAR (pTHX_ REGEXP * const rx,
-                                            const U32 flags);
 EXTERN_C SV *     Plugin_package(pTHX_ REGEXP * const);
 #ifdef USE_ITHREADS
 EXTERN_C void *   Plugin_dupe(pTHX_ REGEXP * const, CLONE_PARAMS *);
@@ -64,14 +51,8 @@ const regexp_engine engine_plugin = {
     Plugin_numbered_buff_FETCH,
     Plugin_numbered_buff_STORE,
     Plugin_numbered_buff_LENGTH,
-    Plugin_named_buff_FETCH,
-    Plugin_named_buff_STORE,
-    Plugin_named_buff_DELETE,
-    Plugin_named_buff_CLEAR,
-    Plugin_named_buff_EXISTS,
-    Plugin_named_buff_FIRSTKEY,
-    Plugin_named_buff_NEXTKEY,
-    Plugin_named_buff_SCALAR,
+    Plugin_named_buff,
+    Plugin_named_buff_iter,
     Plugin_package,
 #if defined(USE_ITHREADS)        
     Plugin_dupe,
@@ -96,18 +77,10 @@ typedef struct replug {
      * Callbacks
      */
 
+    SV * cb_free;
+
     /* ->num_captures */
     SV * cb_num_capture_buff_FETCH;
     SV * cb_num_capture_buff_STORE;
     SV * cb_num_capture_buff_LENGTH;
-
-    /* ->named_captures */
-    SV * cb_named_capture_buff_FETCH;
-    SV * cb_named_capture_buff_STORE;
-    SV * cb_named_capture_buff_DELETE;
-    SV * cb_named_capture_buff_CLEAR;
-    SV * cb_named_capture_buff_EXISTS;
-    SV * cb_named_capture_buff_FIRSTKEY;
-    SV * cb_named_capture_buff_NEXTKEY;
-    SV * cb_named_capture_buff_SCALAR;
 } *re__engine__Plugin;

@@ -18,4 +18,3 @@ my $sv;
 \*STDIN =~ "GLOB";
 sub {}  =~ "CODE";
 bless({} => "main") =~ "main"
-

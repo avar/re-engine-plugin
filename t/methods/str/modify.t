@@ -14,4 +14,3 @@ my $sv = "ook";
 if (\$sv =~ /pattern/) {
     is($sv, "eek");
 }
-

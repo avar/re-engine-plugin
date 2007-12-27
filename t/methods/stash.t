@@ -21,7 +21,6 @@ use re::engine::Plugin (
         my $stash = $re->stash;
         my $ret = $re->stash( $stash );
         ok(!$ret, "stash returns no value on assignment");
-
         my %h = qw( 0 a 1 o 2 e 3 u );
         for (keys %h) {
             is($h{$_}, $stash->[$_]);

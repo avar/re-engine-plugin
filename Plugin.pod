@@ -2,11 +2,6 @@
 
 re::engine::Plugin - API to write custom regex engines
 
-=head1 NOTICE
-
-This is a B<developer release> that requires a patch to blead to work,
-the patch can be found in F<named_capture.patch> in this distribution.
-
 =head1 DESCRIPTION
 
 As of perl 5.9.5 it's possible to lexically replace perl's built-in
@@ -229,10 +224,12 @@ name an example).
 
 =head2 named_captures
 
-B<TODO>: document
+B<TODO>: implement
 
-This is implemented but not documented, see F<t/named_buff> for usage
-examples.
+perl internals still needs to be changed to support this but when it's
+done it'll allow the binding of C<%+> and C<%-> and support the
+L<Tie::Hash> methods FETCH, STORE, DELETE, CLEAR, EXISTS, FIRSTKEY,
+NEXTKEY and SCALAR.
 
 =head1 Tainting
 
@@ -300,11 +297,6 @@ L<perlreapi>, L<Taint::Util>
 I<here be dragons>
 
 =over
-
-=item *
-
-Export constants defined as macros in core relevant to our interests,
-e.g. PMf_ stuff and things needed by extflags.
 
 =item *
 

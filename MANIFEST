@@ -1,20 +1,7 @@
 ChangeLog
-inc/Module/AutoInstall.pm
-inc/Module/Install.pm
-inc/Module/Install/AutoInstall.pm
-inc/Module/Install/Base.pm
-inc/Module/Install/Can.pm
-inc/Module/Install/Fetch.pm
-inc/Module/Install/Include.pm
-inc/Module/Install/Makefile.pm
-inc/Module/Install/Makefile/Version.pm
-inc/Module/Install/Metadata.pm
-inc/Module/Install/Win32.pm
-inc/Module/Install/WriteAll.pm
 Makefile.PL
 MANIFEST			This list of files
-META.yml
-named-capture.patch
+MANIFEST.SKIP
 Plugin.h
 Plugin.pm
 Plugin.pod
@@ -35,14 +22,6 @@ t/methods/stash.t
 t/methods/str/modify.t
 t/methods/str/types.t
 t/methods/str/undef.t
-t/named_buff/CLEAR.t
-t/named_buff/DELETE.t
-t/named_buff/EXISTS.t
-t/named_buff/FETCH.t
-t/named_buff/FIRSTKEY.t
-t/named_buff/NEXTKEY.t
-t/named_buff/SCALAR.t
-t/named_buff/STORE.t
 t/num_buff/FETCH.t
 t/num_buff/LENGTH.t
 t/num_buff/STORE.t
@@ -50,6 +29,7 @@ t/taint/rx.t
 t/taint/util.t
 t/usage/basic.pm
 t/usage/basic.t
-t/usage/import.pm
 t/usage/import.t
+t/usage/import.pm
 typemap
+META.yml                                 Module meta-data (added by MakeMaker)
