@@ -28,7 +28,9 @@ EXTERN_C void     Plugin_numbered_buff_STORE(pTHX_ REGEXP * const,
                                              const I32, SV const * const);
 EXTERN_C I32      Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const,
                                               const SV * const, const I32);
-EXTERN_C SV *     Plugin_named_buff_FETCH(pTHX_ REGEXP * const, SV * const,
+EXTERN_C SV *     Plugin_named_buff (pTHX_ REGEXP * const, SV * const,
+                                     SV * const, const U32);
+EXTERN_C SV *     Plugin_named_buff_iter (pTHX_ REGEXP * const, const SV * const,
                                           const U32);
 EXTERN_C SV *     Plugin_package(pTHX_ REGEXP * const);
 #ifdef USE_ITHREADS
@@ -50,7 +52,8 @@ const regexp_engine engine_plugin = {
     Plugin_numbered_buff_FETCH,
     Plugin_numbered_buff_STORE,
     Plugin_numbered_buff_LENGTH,
-    Plugin_named_buff_FETCH,
+    Plugin_named_buff,
+    Plugin_named_buff_iter,
     Plugin_package,
 #if defined(USE_ITHREADS)        
     Plugin_dupe,

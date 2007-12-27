@@ -326,12 +326,16 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
 
 
 SV*
-Plugin_named_buff_FETCH(pTHX_ REGEXP * const rx, SV * const key, U32 flags)
+Plugin_named_buff (pTHX_ REGEXP * const rx, SV * const key, SV * const value,
+                   const U32 flags)
 {
-    PERL_UNUSED_ARG(rx);
-    PERL_UNUSED_ARG(key);
-    PERL_UNUSED_ARG(flags);
+    return NULL;
+}
 
+SV*
+Plugin_named_buff_iter (pTHX_ REGEXP * const rx, const SV * const lastkey,
+                        const U32 flags)
+{
     return NULL;
 }
 
