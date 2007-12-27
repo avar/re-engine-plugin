@@ -1,11 +1,13 @@
 # See Plugin.pod for documentation
 package re::engine::Plugin;
 use 5.009005;
-use base 'Regexp';
 use strict;
 use XSLoader ();
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
+
+# All engines should subclass the core Regexp package
+our @ISA = 'Regexp';
 
 XSLoader::load __PACKAGE__, $VERSION;
 
