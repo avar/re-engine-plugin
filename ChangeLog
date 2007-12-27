@@ -1,5 +1,7 @@
 2007-12-27  Ævar Arnfjörð Bjarmason  <avar@cpan.org> (0.04)
 
+	* Plugin.pm: Setting @ISA instead of using base.pm
+	* Makefile.PL: Now using ExtUtils::MakeMaker instead of Module::Install
 	* Plugin.(xs|h): Fix up prototypes to match the callbacks in the actual 5.10 release
 	* Plugin.xs: Dumped CODE: in favor of PPCODE:, the former is teh sux
 	* Plugin.xs: Minor cleanups here and there
