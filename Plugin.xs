@@ -67,7 +67,7 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
     rx->extflags = flags;          /* Flags for perl to use */
     rx->engine = RE_ENGINE_PLUGIN; /* Compile to use this engine */
 
-    /* Store a precompiled regexp for pp_regcomp to use */
+    /* Precompiled pattern for pp_regcomp to use */
     rx->prelen = plen;
     rx->precomp = savepvn(exp, rx->prelen);
 
@@ -292,9 +292,7 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
     dSP;
     I32 items;
     SV * callback;
-    re__engine__Plugin self;
-
-    SELF_FROM_PPRIVATE(self,rx->pprivate);
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_num_capture_buff_LENGTH;
 
@@ -347,23 +345,17 @@ Plugin_package(pTHX_ REGEXP * const rx)
 }
 
 MODULE = re::engine::Plugin	PACKAGE = re::engine::Plugin
-PROTOTYPES: ENABLE
+PROTOTYPES: DISABLE
 
-SV *
+void
 pattern(re::engine::Plugin self, ...)
-CODE:
-    SvREFCNT_inc(self->pattern);
-    RETVAL = self->pattern;
-OUTPUT:
-    RETVAL
+PPCODE:
+    XPUSHs(self->pattern);
 
-SV *
+void
 str(re::engine::Plugin self, ...)
-CODE:
-    SvREFCNT_inc(self->str);
-    RETVAL = self->str;
-OUTPUT:
-    RETVAL
+PPCODE:
+    XPUSHs(self->str);
 
 char*
 mod(re::engine::Plugin self, ...)
@@ -398,50 +390,58 @@ PPCODE:
       XPUSHs(&PL_sv_yes);
     }
 
-SV *
+void
 stash(re::engine::Plugin self, ...)
-PREINIT:
-    SV * stash;
-CODE:
+PPCODE:
     if (items > 1) {
-        self->stash = sv_mortalcopy(ST(1));
+        self->stash = ST(1);
         SvREFCNT_inc(self->stash);
+        XSRETURN_EMPTY;
+    } else {
+        XPUSHs(self->stash);
     }
-    SvREFCNT_inc(self->stash);
-    RETVAL = self->stash;
-OUTPUT:
-    RETVAL
 
-SV *
+void
 minlen(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->minlen = (I32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->minlen) {
+            XPUSHs(sv_2mortal(newSViv(self->rx->minlen)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
 
-    RETVAL = self->rx->minlen ? newSViv(self->rx->minlen) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
-
-SV *
+void
 gofs(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->gofs = (U32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->gofs) {
+            XPUSHs(sv_2mortal(newSVuv(self->rx->gofs)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
-    RETVAL = self->rx->gofs ? newSVuv(self->rx->gofs) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
 
-SV *
+void
 nparens(re::engine::Plugin self, ...)
-CODE:
+PPCODE:
     if (items > 1) {
         self->rx->nparens = (U32)SvIV(ST(1));
+        XSRETURN_EMPTY;
+    } else {
+        if (self->rx->nparens) {
+            XPUSHs(sv_2mortal(newSVuv(self->rx->nparens)));
+        } else {
+            XPUSHs(sv_2mortal(&PL_sv_undef));
+        }
     }
-    RETVAL = self->rx->nparens ? newSVuv(self->rx->nparens) : &PL_sv_undef;
-OUTPUT:
-    RETVAL
 
 void
 _num_capture_buff_FETCH(re::engine::Plugin self, ...)

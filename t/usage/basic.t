@@ -1,8 +1,8 @@
 use strict;
-use lib 't';
+use lib 't/usage';
 use Test::More tests => 1;
 
-use Example;
+use basic;
 
 "str" =~ /pattern/;
 

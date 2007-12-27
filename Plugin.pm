@@ -26,7 +26,7 @@ sub import
     my ($pkg, %sub) = @_;
 
     # Valid callbacks
-    my @callback = qw(comp exec intuit checkstr free dupe);
+    my @callback = qw(comp exec);
 
     for (@callback) {
         next unless exists $sub{$_};

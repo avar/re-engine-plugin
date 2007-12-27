@@ -1,6 +1,16 @@
-2007-12-27  Ævar Arnfjörð Bjarmason  <avar@cpan.org>
+2007-12-27  Ævar Arnfjörð Bjarmason  <avar@cpan.org> (0.04)
 
 	* Plugin.(xs|h): Fix up prototypes to match the callbacks in the actual 5.10 release
+	* Plugin.xs: Dumped CODE: in favor of PPCODE:, the former is teh sux
+	* Plugin.xs: Minor cleanups here and there
+	* Plugin.pod: New todo and a developer release notice
+	* Plugin.[h|pm]: Named buffer callbacks
+	* t/methods/stash.t: Test return value of $rx->stash({});
+	* t/methods/str/modify.t: New test for modification of ->str when
+	                          a reference is used
+	* t/methods/str/types.t: This was testing pattern types, fixed
+	* t/Example.[t|pm]: Moved to t/usage
+
 
 2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.03)
 

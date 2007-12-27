@@ -1,4 +1,4 @@
-package Example;
+package basic;
 use strict;
 
 # Note the (), doesn't call ->import

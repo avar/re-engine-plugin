@@ -1,4 +1,3 @@
-
 #define GET_SELF_FROM_PPRIVATE(pprivate)        \
     re__engine__Plugin self;                    \
     SELF_FROM_PPRIVATE(self,pprivate);
