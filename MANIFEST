@@ -42,6 +42,6 @@ t/taint/rx.t
 t/taint/util.t
 t/usage/basic.pm
 t/usage/basic.t
-t/usage/impor.t
+t/usage/import.t
 t/usage/import.pm
 typemap
