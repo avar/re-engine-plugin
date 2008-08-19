@@ -212,7 +212,7 @@ Plugin_free(pTHX_ REGEXP * const rx)
 void *
 Plugin_dupe(pTHX_ const REGEXP * rx, CLONE_PARAMS *param)
 {
-    Perl_croak("dupe not supported yet");
+    Perl_croak(aTHX_ "dupe not supported yet");
     return rx->pprivate;
 }
 

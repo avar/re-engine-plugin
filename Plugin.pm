@@ -4,7 +4,7 @@ use 5.009005;
 use strict;
 use XSLoader ();
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 # All engines should subclass the core Regexp package
 our @ISA = 'Regexp';
