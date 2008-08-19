@@ -11,3 +11,15 @@ WriteMakefile(
         TESTS => 't/*.t t/*/*.t t/*/*/*.t',
     },
 );
+
+sub MY::postamble {
+    return <<END;
+ChangeLog: Makefile
+	git log --pretty=full . >ChangeLog
+
+META.yml: Makefile
+	touch META.yml
+
+END
+}
+

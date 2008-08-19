@@ -1,35 +1,144 @@
-2008-08-19  Ævar Arnfjörð Bjarmason  <avar@cpan.org> (0.05)
+commit 96d386d2bd8b9d06c33837008bd420a9c0b29d28
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
 
-	* Plugin.pm: dos2unix
-	* Plugin.xs: RT#31635: Be compatable with threaded perls
+    bump to 0.06
 
-2007-12-27  Ævar Arnfjörð Bjarmason  <avar@cpan.org> (0.04)
+commit 68e1c1d355f045fd7959393307144aa9a894bbd3
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
 
-	* Plugin.pm: Setting @ISA instead of using base.pm
-	* Makefile.PL: Now using ExtUtils::MakeMaker instead of Module::Install
-	* Plugin.(xs|h): Fix up prototypes to match the callbacks in the actual 5.10 release
-	* Plugin.xs: Dumped CODE: in favor of PPCODE:, the former is teh sux
-	* Plugin.xs: Minor cleanups here and there
-	* Plugin.pod: New todo and a developer release notice
-	* Plugin.[h|pm]: Named buffer callbacks
-	* t/methods/stash.t: Test return value of $rx->stash({});
-	* t/methods/str/modify.t: New test for modification of ->str when
-	                          a reference is used
-	* t/methods/str/types.t: This was testing pattern types, fixed
-	* t/Example.[t|pm]: Moved to t/usage
+    remove unused variables per -Wall
 
-2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.03)
+commit 4c6249853ec480c9cf860a0a6d130a4e42409bc3
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
 
-	* Plugin.xs: The exec callback would call_sv on a NULL value
-	  causing a segfault
-	* Plugin.pod: Use %hash ~~ 'i' instead of $hash{i}, more stylish!
-	* inc: Bumping Module::Install to 0.65
+    Expanded on a comment in example code
 
-2007-05-17 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.02)
+commit d0797f762a80a7ebad75dfd1c453dd2f7a6e38e8
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
 
-	* Brought up to date with current blead after lots of hacking on
-	  blead itself, too many changes to list
+    remove -Wall
 
-2007-02-18 Ævar Arnfjörð Bjarmason <avar@cpan.org> (0.01)
+commit b2d169dc7467a275069b4378c600df905ea1c6ff
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
 
-	* Initial release
+    New ChangeLog file that's made from git, not manually maintained
+
+commit 55b1c44b39286c06a4d352826ac81345b1e0f5cd
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    make the function prototype match the header file
+
+commit 8b916a3b3c9a115c834e192c9c1ecf6f431c8f73
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    also refer to L<perlpragma>
+
+commit dc80cc73f25e62588ca1164b3be3a281e6acb3be
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    typo in ok() docs, /x mod not /i
+
+commit 2b8c214d523e63053b8216b9011b45037922ec3f
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Bump to 0.05
+
+commit 9577daa3b2c3e93ee91478a50461f7b8a8702bd8
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    dos2unix to get rid of \r\n
+
+commit 2fe84543333001d29ca366aeb8e795de7ef7772e
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Bump version to 0.05
+
+commit 5feac29518975b05987edbc997123cfa06586bb8
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Update copyright notice to 2008
+
+commit 3988d8ac3fc89133fc48d19c8e5f986f97ac9ae3
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Removed genetared META.yml file
+
+commit 56513ca501ad38f5358ca5f3ee8bdb5ba61b4639
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    RT#31635: add aTHX_ to Perl_croak call so it'll run on threaded perls
+
+commit 5da29bf099eb7bfbc1afcba037356cf196e72a72
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Now using ExtUtils::MakeMaker instead of Module::Install
+
+commit 933728271dfc39e78c1c91913753ad49655f32b2
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    more stuff for 0.04
+
+commit d81c7c9f05735ada95a64682a6a810bf8e0d302b
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Bump $VERSION to 0.04
+    Don't use base, set @ISA directly
+
+commit 5082c33697a378822636072363223ba929a9b51f
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    format
+
+commit 3fa42bbb85f17d6edd50bf3ede176ee80b0f2007
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    import.t not impor.t
+
+commit 17828d44aeb1c7f68794671796104f7a088c5964
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    gitignore and MANIFEST stuff
+
+commit 86e082409eeb8df843893486f92273c0e46d7637
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Backported from 0.04_01
+
+commit 5b5f13004fe16542da2b113b9b45157ceccef343
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Bumping the changelog
+
+commit 5a42c05b23e4ffea50b5bfe897992b013c9e90a4
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    Fix up prototypes to match the callbacks in the actual 5.10 release
+
+commit 4d5d5872e8624a2e37fb68c6a280f497806313e8
+Author: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+Commit: Ævar Arnfjörð Bjarmason <avar@cpan.org>
+
+    0.03 from cpan

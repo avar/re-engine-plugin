@@ -19,12 +19,12 @@ C</pattern/> or runtime for C<qr//> patterns, or something inbetween
 depending on variable interpolation etc.
 
 When this module is loaded into a scope it inserts a hook into
-C<$^H{regcomp}> (as described in L<perlreapi>) to have each regexp
-constructed in its lexical scope handled by this engine, but it
-differs from other engines in that it also inserts other hooks into
-C<%^H> in the same scope that point to user-defined subroutines to use
-during compilation, execution etc, these are described in
-L</CALLBACKS> below.
+C<$^H{regcomp}> (as described in L<perlreapi> and L<perlpragma>) to
+have each regexp constructed in its lexical scope handled by this
+engine, but it differs from other engines in that it also inserts
+other hooks into C<%^H> in the same scope that point to user-defined
+subroutines to use during compilation, execution etc, these are
+described in L</CALLBACKS> below.
 
 The callbacks (e.g. L</comp>) then get called with a
 L<re::engine::Plugin> object as their first argument. This object
@@ -51,7 +51,7 @@ caller's scope use use the following snippet:
 
     sub import
     {
-        # Populates the caller's %^H with our callbacks
+        # Sets the caller's $^H{regcomp} his %^H with our callbacks
         re::engine::Plugin->import(
             comp => \&comp,
             exec => \&exec,
