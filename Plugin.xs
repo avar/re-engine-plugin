@@ -44,13 +44,11 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
     dSP;
     REGEXP * rx;
     re__engine__Plugin re;
-    I32 count;
     I32 buffers;
 
     /* exp/xend version of the pattern & length */
     STRLEN plen;
     char*  exp = SvPV((SV*)pattern, plen);
-    char* xend = exp + plen;
 
     /* The REGEXP structure to return to perl */
     Newxz(rx, 1, REGEXP);
@@ -261,7 +259,6 @@ Plugin_numbered_buff_STORE(pTHX_ REGEXP * const rx, const I32 paren,
                            SV const * const value)
 {
     dSP;
-    I32 items;
     SV * callback;
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
@@ -290,7 +287,6 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
                               const I32 paren)
 {
     dSP;
-    I32 items;
     SV * callback;
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
