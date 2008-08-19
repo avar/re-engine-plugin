@@ -30,7 +30,7 @@ use re::engine::Plugin (
         # modifiers
         my %mod = $re->mod;
         ok(exists $mod{i}, 'str flags /i');
-        ok(exists $mod{x}, 'str flags /i');
+        ok(exists $mod{x}, 'str flags /x');
         like(join('', keys %mod), qr/^[cgimosx]+$/, 'flags contain all-good characters');
 
         # stash
