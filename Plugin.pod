@@ -51,7 +51,7 @@ caller's scope use use the following snippet:
 
     sub import
     {
-        # Populates the caller's %^H with our callbacks
+        # Sets the caller's $^H{regcomp} his %^H with our callbacks
         re::engine::Plugin->import(
             comp => \&comp,
             exec => \&exec,
