@@ -1,10 +1,9 @@
 use strict;
-use Test::More tests => 3;
+use Test::More tests => ($] <= 5.010 ? 3 : 1);
 use re::engine::Plugin (
     comp => sub {
         my ($re, $str) = @_;
 
-        # Runs three times apperently.
         is($re->str, undef, 'str is undef');
 
         return;
