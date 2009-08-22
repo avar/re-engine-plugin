@@ -110,7 +110,7 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
 
     buffers = rx->nparens;
 
-    Newxz(rx->offs, buffers, regexp_paren_pair);
+    Newxz(rx->offs, buffers + 1, regexp_paren_pair);
 
     return rx;
 }
