@@ -283,7 +283,7 @@ Plugin_numbered_buff_STORE(pTHX_ REGEXP * const RX, const I32 paren,
         PUSHMARK(SP);
         XPUSHs(rx->pprivate);
         XPUSHs(sv_2mortal(newSViv(paren)));
-        XPUSHs(SvREFCNT_inc(value));
+        XPUSHs(SvREFCNT_inc((SV *) value));
         PUTBACK;
 
         call_sv(callback, G_DISCARD);
