@@ -1,0 +1,35 @@
+0.06    2008-08-19 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Plugin.pm: Tweaks
+        * Plugin.xs: Fix prototype mismatch for Plugin_dupe()
+
+0.05    2008-08-19 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Plugin.pm: dos2unix
+        * Plugin.xs: RT#31635: Be compatable with threaded perls
+
+0.04    2007-12-27 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Plugin.pm: Setting @ISA instead of using base.pm
+        * Makefile.PL: Now using ExtUtils::MakeMaker instead of Module::Install
+        * Plugin.(xs|h): Fix up prototypes to match the callbacks in the actual
+                         5.10 release
+        * Plugin.xs: Dumped CODE: in favor of PPCODE:, the former is teh sux
+        * Plugin.xs: Minor cleanups here and there
+        * Plugin.pod: New todo and a developer release notice
+        * Plugin.[h|pm]: Named buffer callbacks
+        * t/methods/stash.t: Test return value of $rx->stash({});
+        * t/methods/str/modify.t: New test for modification of ->str when
+                                  a reference is used
+        * t/methods/str/types.t: This was testing pattern types, fixed
+        * t/Example.[t|pm]: Moved to t/usage
+
+0.03    2007-05-17 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Plugin.xs: The exec callback would call_sv on a NULL value
+          causing a segfault
+        * Plugin.pod: Use %hash ~~ 'i' instead of $hash{i}, more stylish!
+        * inc: Bumping Module::Install to 0.65
+
+0.02    2007-05-17 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Brought up to date with current blead after lots of hacking on
+          blead itself, too many changes to list
+
+0.01    2007-02-18 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
+        * Initial release
