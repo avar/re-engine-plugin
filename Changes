@@ -1,3 +1,7 @@
+0.07    2009-08-23 09:30 UTC - Vincent Pit
+        + Fix : [perl #38684]: test failures in t/method/mod.t
+        + Fix : Building with blead.
+
 0.06    2008-08-19 - Ævar Arnfjörð Bjarmason <avar@cpan.org>
         * Plugin.pm: Tweaks
         * Plugin.xs: Fix prototype mismatch for Plugin_dupe()
