@@ -20,16 +20,16 @@ my %META = (
 );
 
 WriteMakefile(
-    NAME          => 're::engine::Plugin',
-    AUTHOR        => 'Vincent Pit <perl@profvince.com>',
-    LICENSE       => 'perl',
-    ABSTRACT_FROM => 'Plugin.pod',
-    VERSION_FROM  => 'Plugin.pm',
+    NAME             => 're::engine::Plugin',
+    AUTHOR           => 'Vincent Pit <perl@profvince.com>',
+    LICENSE          => 'perl',
+    ABSTRACT_FROM    => 'Plugin.pod',
+    VERSION_FROM     => 'Plugin.pm',
     PL_FILES         => {},
     PREREQ_PM        => {
         'XSLoader' => 0,
     },
-    MIN_PERL_VERSION => 5.008,
+    MIN_PERL_VERSION => 5.009005,
     META_MERGE       => \%META,
     dist             => {
         PREOP    => 'pod2text Plugin.pod > $(DISTVNAME)/README',
