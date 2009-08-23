@@ -14,7 +14,11 @@
 
 START_EXTERN_C
 EXTERN_C const regexp_engine engine_plugin;
-EXTERN_C REGEXP * Plugin_comp(pTHX_ const SV const *, const U32);
+#if PERL_VERSION <= 10
+EXTERN_C REGEXP * Plugin_comp(pTHX_ const SV * const, const U32);
+#else
+EXTERN_C REGEXP * Plugin_comp(pTHX_ SV * const, U32);
+#endif
 EXTERN_C I32      Plugin_exec(pTHX_ REGEXP * const, char *, char *,
                               char *, I32, SV *, void *, U32);
 EXTERN_C char *   Plugin_intuit(pTHX_ REGEXP * const, SV *, char *,
@@ -60,9 +64,9 @@ const regexp_engine engine_plugin = {
 };
 
 typedef struct replug {
-    /* Pointer back to the containing REGEXP struct so that accessors
+    /* Pointer back to the containing regexp struct so that accessors
      * can modify nparens, gofs etc. */
-    REGEXP * rx;
+    struct regexp * rx;
 
     /* A copy of the pattern given to comp, for ->pattern */
     SV * pattern;
@@ -84,3 +88,11 @@ typedef struct replug {
     SV * cb_num_capture_buff_STORE;
     SV * cb_num_capture_buff_LENGTH;
 } *re__engine__Plugin;
+
+#if PERL_VERSION >= 11
+# define rxREGEXP(RX)  (SvANY(RX))
+# define newREGEXP(RX) ((RX) = ((REGEXP*) newSV_type(SVt_REGEXP)))
+#else
+# define rxREGEXP(RX)  (RX)
+# define newREGEXP(RX) (Newxz((RX), 1, struct regexp))
+#endif

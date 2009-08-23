@@ -39,10 +39,15 @@ get_H_callback(const char* key)
 }
 
 REGEXP *
+#if PERL_VERSION <= 10
 Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
+#else
+Plugin_comp(pTHX_ SV * const pattern, U32 flags)
+#endif
 {
     dSP;
-    REGEXP * rx;
+    struct regexp * rx;
+    REGEXP *RX;
     re__engine__Plugin re;
     I32 buffers;
 
@@ -50,20 +55,22 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
     STRLEN plen;
     char*  exp = SvPV((SV*)pattern, plen);
 
-    /* The REGEXP structure to return to perl */
-    Newxz(rx, 1, REGEXP);
-
     /* Our blessed object */
     SV *obj = newSV(0);
     SvREFCNT_inc(obj);
     Newxz(re, 1, struct replug);
     sv_setref_pv(obj, "re::engine::Plugin", (void*)re);
 
+    newREGEXP(RX);
+    rx = rxREGEXP(RX);
+
     re->rx = rx;                   /* Make the rx accessible from self->rx */
-    rx->refcnt = 1;                /* Refcount so we won' be destroyed */
     rx->intflags = flags;          /* Flags for internal use */
     rx->extflags = flags;          /* Flags for perl to use */
     rx->engine = RE_ENGINE_PLUGIN; /* Compile to use this engine */
+
+#if PERL_VERSION <= 10
+    rx->refcnt = 1;                /* Refcount so we won't be destroyed */
 
     /* Precompiled pattern for pp_regcomp to use */
     rx->prelen = plen;
@@ -75,6 +82,7 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
     rx->wraplen = rx->prelen;
     Newx(rx->wrapped, rx->wraplen, char);
     Copy(rx->precomp, rx->wrapped, rx->wraplen, char);
+#endif
 
     /* Store our private object */
     rx->pprivate = obj;
@@ -112,16 +120,17 @@ Plugin_comp(pTHX_ const SV * const pattern, const U32 flags)
 
     Newxz(rx->offs, buffers + 1, regexp_paren_pair);
 
-    return rx;
+    return RX;
 }
 
 I32
-Plugin_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
+Plugin_exec(pTHX_ REGEXP * const RX, char *stringarg, char *strend,
             char *strbeg, I32 minend, SV *sv, void *data, U32 flags)
 {
     dSP;
     I32 matched;
     SV * callback = get_H_callback("exec");
+    struct regexp *rx = rxREGEXP(RX);
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     if (callback) {
@@ -159,10 +168,10 @@ Plugin_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
 }
 
 char *
-Plugin_intuit(pTHX_ REGEXP * const rx, SV *sv, char *strpos,
+Plugin_intuit(pTHX_ REGEXP * const RX, SV *sv, char *strpos,
                      char *strend, U32 flags, re_scream_pos_data *data)
 {
-    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(RX);
     PERL_UNUSED_ARG(sv);
     PERL_UNUSED_ARG(strpos);
     PERL_UNUSED_ARG(strend);
@@ -172,16 +181,16 @@ Plugin_intuit(pTHX_ REGEXP * const rx, SV *sv, char *strpos,
 }
 
 SV *
-Plugin_checkstr(pTHX_ REGEXP * const rx)
+Plugin_checkstr(pTHX_ REGEXP * const RX)
 {
-    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(RX);
     return NULL;
 }
 
 void
-Plugin_free(pTHX_ REGEXP * const rx)
+Plugin_free(pTHX_ REGEXP * const RX)
 {
-    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(RX);
 /*
     dSP;
     SV * callback;
@@ -208,20 +217,22 @@ Plugin_free(pTHX_ REGEXP * const rx)
 }
 
 void *
-Plugin_dupe(pTHX_ REGEXP * const rx, CLONE_PARAMS *param)
+Plugin_dupe(pTHX_ REGEXP * const RX, CLONE_PARAMS *param)
 {
+    struct regexp *rx = rxREGEXP(RX);
     Perl_croak(aTHX_ "dupe not supported yet");
     return rx->pprivate;
 }
 
 
 void
-Plugin_numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
+Plugin_numbered_buff_FETCH(pTHX_ REGEXP * const RX, const I32 paren,
                            SV * const sv)
 {
     dSP;
     I32 items;
     SV * callback;
+    struct regexp *rx = rxREGEXP(RX);
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_num_capture_buff_FETCH;
@@ -255,11 +266,12 @@ Plugin_numbered_buff_FETCH(pTHX_ REGEXP * const rx, const I32 paren,
 }
 
 void
-Plugin_numbered_buff_STORE(pTHX_ REGEXP * const rx, const I32 paren,
+Plugin_numbered_buff_STORE(pTHX_ REGEXP * const RX, const I32 paren,
                            SV const * const value)
 {
     dSP;
     SV * callback;
+    struct regexp *rx = rxREGEXP(RX);
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_num_capture_buff_STORE;
@@ -283,11 +295,12 @@ Plugin_numbered_buff_STORE(pTHX_ REGEXP * const rx, const I32 paren,
 }
 
 I32
-Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
+Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const RX, const SV * const sv,
                               const I32 paren)
 {
     dSP;
     SV * callback;
+    struct regexp *rx = rxREGEXP(RX);
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_num_capture_buff_LENGTH;
@@ -320,23 +333,23 @@ Plugin_numbered_buff_LENGTH(pTHX_ REGEXP * const rx, const SV * const sv,
 
 
 SV*
-Plugin_named_buff (pTHX_ REGEXP * const rx, SV * const key, SV * const value,
+Plugin_named_buff (pTHX_ REGEXP * const RX, SV * const key, SV * const value,
                    const U32 flags)
 {
     return NULL;
 }
 
 SV*
-Plugin_named_buff_iter (pTHX_ REGEXP * const rx, const SV * const lastkey,
+Plugin_named_buff_iter (pTHX_ REGEXP * const RX, const SV * const lastkey,
                         const U32 flags)
 {
     return NULL;
 }
 
 SV*
-Plugin_package(pTHX_ REGEXP * const rx)
+Plugin_package(pTHX_ REGEXP * const RX)
 {
-    PERL_UNUSED_ARG(rx);
+    PERL_UNUSED_ARG(RX);
     return newSVpvs("re::engine::Plugin");
 }
 
