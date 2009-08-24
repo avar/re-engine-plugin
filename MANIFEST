@@ -7,6 +7,7 @@ Plugin.h
 Plugin.pm
 Plugin.pod
 Plugin.xs
+README
 t/00-compile.t
 t/eval-comp.t
 t/eval-exec.t
