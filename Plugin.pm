@@ -2,14 +2,16 @@
 package re::engine::Plugin;
 use 5.009005;
 use strict;
-use XSLoader ();
 
-our $VERSION = '0.07';
+our ($VERSION, @ISA);
 
-# All engines should subclass the core Regexp package
-our @ISA = 'Regexp';
-
-XSLoader::load __PACKAGE__, $VERSION;
+BEGIN {
+ $VERSION = '0.07';
+ # All engines should subclass the core Regexp package
+ @ISA = 'Regexp';
+ require XSLoader;
+ XSLoader::load(__PACKAGE__, $VERSION);
+}
 
 my $RE_ENGINE_PLUGIN = ENGINE();
 
