@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => ($] <= 5.010 ? 3 : 1);
+use Test::More tests => 1;
 use re::engine::Plugin (
     comp => sub {
         my ($re, $str) = @_;

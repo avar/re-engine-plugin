@@ -8,6 +8,7 @@ Plugin.pm
 Plugin.pod
 Plugin.xs
 README
+ptable.h
 t/00-compile.t
 t/eval-comp.t
 t/eval-exec.t

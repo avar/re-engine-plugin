@@ -1,41 +1,256 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+
 #include "Plugin.h"
 
-SV*
-get_H_callback(const char* key)
-{
-    dVAR;
-    dSP;
+#define __PACKAGE__     "re::engine::Plugin"
+#define __PACKAGE_LEN__ (sizeof(__PACKAGE__)-1)
 
-    SV * callback;
+#define REP_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
 
-    ENTER;
-    SAVETMPS;
-   
-    PUSHMARK(SP);
-    XPUSHs(sv_2mortal(newSVpv(key, 0)));
-    PUTBACK;
+#ifndef REP_WORKAROUND_REQUIRE_PROPAGATION
+# define REP_WORKAROUND_REQUIRE_PROPAGATION !REP_HAS_PERL(5, 10, 1)
+#endif
 
-    call_pv("re::engine::Plugin::_get_callback", G_SCALAR);
+/* ... Thread safety and multiplicity ...................................... */
 
-    SPAGAIN;
+#ifndef REP_MULTIPLICITY
+# if defined(MULTIPLICITY) || defined(PERL_IMPLICIT_CONTEXT)
+#  define REP_MULTIPLICITY 1
+# else
+#  define REP_MULTIPLICITY 0
+# endif
+#endif
+#if REP_MULTIPLICITY && !defined(tTHX)
+# define tTHX PerlInterpreter*
+#endif
 
-    callback = POPs;
-    SvREFCNT_inc(callback); /* refcount++ or FREETMPS below will collect us */
+#if REP_MULTIPLICITY && defined(USE_ITHREADS) && defined(dMY_CXT) && defined(MY_CXT) && defined(START_MY_CXT) && defined(MY_CXT_INIT) && (defined(MY_CXT_CLONE) || defined(dMY_CXT_SV))
+# define REP_THREADSAFE 1
+# ifndef MY_CXT_CLONE
+#  define MY_CXT_CLONE \
+    dMY_CXT_SV;                                                      \
+    my_cxt_t *my_cxtp = (my_cxt_t*)SvPVX(newSV(sizeof(my_cxt_t)-1)); \
+    Copy(INT2PTR(my_cxt_t*, SvUV(my_cxt_sv)), my_cxtp, 1, my_cxt_t); \
+    sv_setuv(my_cxt_sv, PTR2UV(my_cxtp))
+# endif
+#else
+# define REP_THREADSAFE 0
+# undef  dMY_CXT
+# define dMY_CXT      dNOOP
+# undef  MY_CXT
+# define MY_CXT       rep_globaldata
+# undef  START_MY_CXT
+# define START_MY_CXT STATIC my_cxt_t MY_CXT;
+# undef  MY_CXT_INIT
+# define MY_CXT_INIT  NOOP
+# undef  MY_CXT_CLONE
+# define MY_CXT_CLONE NOOP
+#endif
 
-    /* If we don't get a valid CODE value return a NULL callback, in
-     * that case the hooks won't call back into Perl space */
-    if (!SvROK(callback) || SvTYPE(SvRV(callback)) != SVt_PVCV) {
-        callback = NULL;
-    }
+/* --- Helpers ------------------------------------------------------------- */
 
-    PUTBACK;
-    FREETMPS;
-    LEAVE;
+/* ... Thread-safe hints ................................................... */
 
-    return callback;
+typedef struct {
+ SV  *comp;
+ SV  *exec;
+#if REP_WORKAROUND_REQUIRE_PROPAGATION
+ I32  requires;
+#endif
+} rep_hint_t;
+
+#if REP_THREADSAFE
+
+#define PTABLE_VAL_FREE(V) { \
+ rep_hint_t *h = (V);        \
+ SvREFCNT_dec(h->comp);      \
+ SvREFCNT_dec(h->exec);      \
+ PerlMemShared_free(h);      \
+}
+
+#define pPTBL  pTHX
+#define pPTBL_ pTHX_
+#define aPTBL  aTHX
+#define aPTBL_ aTHX_
+
+#include "ptable.h"
+
+#define ptable_store(T, K, V) ptable_store(aTHX_ (T), (K), (V))
+#define ptable_free(T)        ptable_free(aTHX_ (T))
+
+#define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
+
+typedef struct {
+ ptable *tbl;
+ tTHX    owner;
+} my_cxt_t;
+
+START_MY_CXT
+
+STATIC SV *rep_clone(pTHX_ SV *sv, tTHX owner) {
+#define rep_clone(S, O) rep_clone(aTHX_ (S), (O))
+ CLONE_PARAMS  param;
+ AV           *stashes = NULL;
+ SV           *dupsv;
+
+ if (SvTYPE(sv) == SVt_PVHV && HvNAME_get(sv))
+  stashes = newAV();
+
+ param.stashes    = stashes;
+ param.flags      = 0;
+ param.proto_perl = owner;
+
+ dupsv = sv_dup(sv, &param);
+
+ if (stashes) {
+  av_undef(stashes);
+  SvREFCNT_dec(stashes);
+ }
+
+ return SvREFCNT_inc(dupsv);
+}
+
+STATIC void rep_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
+ my_cxt_t   *ud = ud_;
+ rep_hint_t *h1 = ent->val;
+ rep_hint_t *h2;
+
+ if (ud->owner == aTHX)
+  return;
+
+ h2           = PerlMemShared_malloc(sizeof *h2);
+ h2->comp     = rep_clone(h1->comp, ud->owner);
+ SvREFCNT_inc(h2->comp);
+ h2->exec     = rep_clone(h1->exec, ud->owner);
+ SvREFCNT_inc(h2->exec);
+#if REP_WORKAROUND_REQUIRE_PROPAGATION
+ h2->requires = h1->requires;
+#endif
+
+ ptable_store(ud->tbl, ent->key, h2);
+}
+
+STATIC void rep_thread_cleanup(pTHX_ void *);
+
+STATIC void rep_thread_cleanup(pTHX_ void *ud) {
+ int *level = ud;
+
+ if (*level) {
+  *level = 0;
+  LEAVE;
+  SAVEDESTRUCTOR_X(rep_thread_cleanup, level);
+  ENTER;
+ } else {
+  dMY_CXT;
+  PerlMemShared_free(level);
+  ptable_free(MY_CXT.tbl);
+ }
+}
+
+#endif /* REP_THREADSAFE */
+
+STATIC SV *rep_validate_callback(SV *code) {
+ if (!SvROK(code))
+  return NULL;
+
+ code = SvRV(code);
+ if (SvTYPE(code) < SVt_PVCV)
+  return NULL;
+
+ return SvREFCNT_inc_simple_NN(code);
+}
+
+STATIC SV *rep_tag(pTHX_ SV *comp, SV *exec) {
+#define rep_tag(C, E) rep_tag(aTHX_ (C), (E))
+ rep_hint_t *h;
+ dMY_CXT;
+
+ h = PerlMemShared_malloc(sizeof *h);
+
+ h->comp = rep_validate_callback(comp);
+ h->exec = rep_validate_callback(exec);
+
+#if REP_WORKAROUND_REQUIRE_PROPAGATION
+ {
+  const PERL_SI *si;
+  I32            requires = 0;
+
+  for (si = PL_curstackinfo; si; si = si->si_prev) {
+   I32 cxix;
+
+   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
+
+    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
+     ++requires;
+   }
+  }
+
+  h->requires = requires;
+ }
+#endif
+
+#if REP_THREADSAFE
+ /* We only need for the key to be an unique tag for looking up the value later.
+  * Allocated memory provides convenient unique identifiers, so that's why we
+  * use the hint as the key itself. */
+ ptable_store(MY_CXT.tbl, h, h);
+#endif /* REP_THREADSAFE */
+
+ return newSViv(PTR2IV(h));
+}
+
+STATIC const rep_hint_t *rep_detag(pTHX_ const SV *hint) {
+#define rep_detag(H) rep_detag(aTHX_ (H))
+ rep_hint_t *h;
+ dMY_CXT;
+
+ if (!(hint && SvIOK(hint)))
+  return NULL;
+
+ h = INT2PTR(rep_hint_t *, SvIVX(hint));
+#if REP_THREADSAFE
+ h = ptable_fetch(MY_CXT.tbl, h);
+#endif /* REP_THREADSAFE */
+
+#if REP_WORKAROUND_REQUIRE_PROPAGATION
+ {
+  const PERL_SI *si;
+  I32            requires = 0;
+
+  for (si = PL_curstackinfo; si; si = si->si_prev) {
+   I32 cxix;
+
+   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
+
+    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE
+                               && ++requires > h->requires)
+     return NULL;
+   }
+  }
+ }
+#endif
+
+ return h;
+}
+
+STATIC U32 rep_hash = 0;
+
+STATIC const rep_hint_t *rep_hint(pTHX) {
+#define rep_hint() rep_hint(aTHX)
+ SV *hint;
+
+ /* We already require 5.9.5 for the regexp engine API. */
+ hint = Perl_refcounted_he_fetch(aTHX_ PL_curcop->cop_hints_hash,
+                                       NULL,
+                                       __PACKAGE__, __PACKAGE_LEN__,
+                                       0,
+                                       rep_hash);
+
+ return rep_detag(hint);
 }
 
 REGEXP *
@@ -48,8 +263,9 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
     dSP;
     struct regexp * rx;
     REGEXP *RX;
-    re__engine__Plugin re;
     I32 buffers;
+    re__engine__Plugin re;
+    const rep_hint_t *h;
 
     /* exp/xend version of the pattern & length */
     STRLEN plen;
@@ -96,9 +312,8 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
      * already set up all the stuff we're going to to need for
      * subsequent exec and other calls
      */
-    SV * callback = get_H_callback("comp");
-
-    if (callback) {
+    h = rep_hint();
+    if (h && h->comp) {
         ENTER;    
         SAVETMPS;
    
@@ -106,7 +321,7 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
         XPUSHs(obj);
         PUTBACK;
 
-        call_sv(callback, G_DISCARD);
+        call_sv(h->comp, G_DISCARD);
 
         FREETMPS;
         LEAVE;
@@ -129,11 +344,12 @@ Plugin_exec(pTHX_ REGEXP * const RX, char *stringarg, char *strend,
 {
     dSP;
     I32 matched;
-    SV * callback = get_H_callback("exec");
     struct regexp *rx = rxREGEXP(RX);
+    const rep_hint_t *h;
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
-    if (callback) {
+    h = rep_hint();
+    if (h && h->exec) {
         /* Store the current str for ->str */
         self->str = (SV*)sv;
         SvREFCNT_inc(self->str);
@@ -146,7 +362,7 @@ Plugin_exec(pTHX_ REGEXP * const RX, char *stringarg, char *strend,
         XPUSHs(sv);
         PUTBACK;
 
-        call_sv(callback, G_SCALAR);
+        call_sv(h->exec, G_SCALAR);
  
         SPAGAIN;
 
@@ -353,8 +569,80 @@ Plugin_package(pTHX_ REGEXP * const RX)
     return newSVpvs("re::engine::Plugin");
 }
 
+#if REP_THREADSAFE
+
+STATIC U32 rep_initialized = 0;
+
+STATIC void rep_teardown(pTHX_ void *root) {
+ dMY_CXT;
+
+ if (!rep_initialized || aTHX != root)
+  return;
+
+ ptable_free(MY_CXT.tbl);
+
+ rep_initialized = 0;
+}
+
+STATIC void rep_setup(pTHX) {
+#define rep_setup() rep_setup(aTHX)
+ if (rep_initialized)
+  return;
+
+ MY_CXT_INIT;
+ MY_CXT.tbl   = ptable_new();
+ MY_CXT.owner = aTHX;
+
+ call_atexit(rep_teardown, aTHX);
+
+ rep_initialized = 1;
+}
+
+#else  /*  REP_THREADSAFE */
+
+#define rep_setup()
+
+#endif /* !REP_THREADSAFE */
+
+STATIC U32 rep_booted = 0;
+
+/* --- XS ------------------------------------------------------------------ */
+
 MODULE = re::engine::Plugin	PACKAGE = re::engine::Plugin
+
 PROTOTYPES: DISABLE
+
+BOOT:
+{
+    if (!rep_booted++) {
+        PERL_HASH(rep_hash, __PACKAGE__, __PACKAGE_LEN__);
+    }
+
+    rep_setup();
+}
+
+#if REP_THREADSAFE
+
+void
+CLONE(...)
+PREINIT:
+    ptable *t;
+    int    *level;
+CODE:
+    {
+	my_cxt_t ud;
+	dMY_CXT;
+	ud.tbl   = t = ptable_new();
+	ud.owner = MY_CXT.owner;
+	ptable_walk(MY_CXT.tbl, rep_ptable_clone, &ud);
+    }
+    {
+	MY_CXT_CLONE;
+	MY_CXT.tbl   = t;
+	MY_CXT.owner = aTHX;
+    }
+
+#endif
 
 void
 pattern(re::engine::Plugin self, ...)
@@ -475,6 +763,13 @@ PPCODE:
         self->cb_num_capture_buff_LENGTH = ST(1);
         SvREFCNT_inc(self->cb_num_capture_buff_LENGTH);
     }
+
+SV *
+_tag(SV *comp, SV *exec)
+CODE:
+    RETVAL = rep_tag(comp, exec);
+OUTPUT:
+    RETVAL
 
 void
 ENGINE()

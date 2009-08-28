@@ -15,16 +15,6 @@ BEGIN {
 
 my $RE_ENGINE_PLUGIN = ENGINE();
 
-# How many? Used to cheat %^H
-my $callback = 1;
-
-# Where we store our CODE refs
-my %callback;
-
-# Generate a key to use in the %^H hash from a string, prefix the
-# package name like L<pragma> does
-my $key = sub { __PACKAGE__ . "::" . $_[0] };
-
 sub import
 {
     my ($pkg, %sub) = @_;
@@ -34,25 +24,20 @@ sub import
 
     for (@callback) {
         next unless exists $sub{$_};
-        my $cb = delete $sub{$_};
+        my $cb = $sub{$_};
 
         unless (ref $cb eq 'CODE') {
             require Carp;
             Carp::croak("'$_' is not CODE");
         }
-
-        # Get an ID to use
-        my $id = $callback ++;
-
-        # Insert into our callback storage,
-        $callback{$_}->{$id} = $cb;
-
-        # Instert into our cache with a key we can retrive later
-        # knowing the ID in %^H and what callback we're getting
-        $^H{ $key->($_) } = $id;
     }
 
-    $^H{regcomp} = $RE_ENGINE_PLUGIN;
+    $^H |= 0x020000;
+
+    $^H{+(__PACKAGE__)} = _tag(@sub{@callback});
+    $^H{regcomp}        = $RE_ENGINE_PLUGIN;
+
+    return;
 }
 
 sub unimport
@@ -60,20 +45,10 @@ sub unimport
     # Delete the regcomp hook
     delete $^H{regcomp}
         if $^H{regcomp} == $RE_ENGINE_PLUGIN;
-}
 
-# Minimal function to get CODE for a given key to be called by the
-# get_H_callback C function.
-sub _get_callback
-{
-    my ($name) = @_; # 'comp', 'exec', ...
+    delete $^H{+(__PACKAGE__)};
 
-    my $h = (caller(0))[10];
-    my $id = $h->{ $key->($name) };
-
-    my $cb = defined $id ? $callback{$name}->{$id} : 0;
-
-    return $cb;
+    return;
 }
 
 sub num_captures
