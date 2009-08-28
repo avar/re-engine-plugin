@@ -1,3 +1,7 @@
+/* This file is part of the re::engine::Plugin Perl module.
+ * See http://search.cpan.org/dist/re-engine-Plugin/ */
+
+#define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
