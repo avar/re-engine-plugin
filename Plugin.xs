@@ -772,6 +772,7 @@ void
 _num_capture_buff_FETCH(re::engine::Plugin self, ...)
 PPCODE:
     if (items > 1) {
+        SvREFCNT_dec(self->cb_num_capture_buff_FETCH);
         self->cb_num_capture_buff_FETCH = ST(1);
         SvREFCNT_inc(self->cb_num_capture_buff_FETCH);
     }
@@ -780,6 +781,7 @@ void
 _num_capture_buff_STORE(re::engine::Plugin self, ...)
 PPCODE:
     if (items > 1) {
+        SvREFCNT_dec(self->cb_num_capture_buff_STORE);
         self->cb_num_capture_buff_STORE = ST(1);
         SvREFCNT_inc(self->cb_num_capture_buff_STORE);
     }
@@ -788,6 +790,7 @@ void
 _num_capture_buff_LENGTH(re::engine::Plugin self, ...)
 PPCODE:
     if (items > 1) {
+        SvREFCNT_dec(self->cb_num_capture_buff_LENGTH);
         self->cb_num_capture_buff_LENGTH = ST(1);
         SvREFCNT_inc(self->cb_num_capture_buff_LENGTH);
     }
