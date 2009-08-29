@@ -311,12 +311,25 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
     re->pattern = (SV*)pattern;
     SvREFCNT_inc(re->pattern);
 
+    h = rep_hint();
+
+    /* If there's an exec callback, store it into the private object so
+     * that it will be the one to be called, even if the engine changes
+     * in between */
+    if (h && h->exec) {
+        re->cb_exec = h->exec;
+	SvREFCNT_inc_simple_void_NN(h->exec);
+    }
+
+    re->cb_num_capture_buff_FETCH  = NULL;
+    re->cb_num_capture_buff_STORE  = NULL;
+    re->cb_num_capture_buff_LENGTH = NULL;
+
     /*
      * Call our callback function if one was defined, if not we've
      * already set up all the stuff we're going to to need for
      * subsequent exec and other calls
      */
-    h = rep_hint();
     if (h && h->comp) {
         ENTER;    
         SAVETMPS;
@@ -329,14 +342,6 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
 
         FREETMPS;
         LEAVE;
-    }
-
-    /* If there's an exec callback, store it into the private object so
-     * that it will be the one to be called, even if the engine changes
-     * in between */
-    if (h && h->exec) {
-        re->cb_exec = h->exec;
-	SvREFCNT_inc_simple_void_NN(h->exec);
     }
 
     /* If any of the comp-time accessors were called we'll have to
@@ -416,11 +421,24 @@ Plugin_checkstr(pTHX_ REGEXP * const RX)
 void
 Plugin_free(pTHX_ REGEXP * const RX)
 {
-    PERL_UNUSED_ARG(RX);
+    struct regexp *rx = rxREGEXP(RX);
+    GET_SELF_FROM_PPRIVATE(rx->pprivate);
+
+    SvREFCNT_dec(self->pattern);
+    SvREFCNT_dec(self->str);
+
+    SvREFCNT_dec(self->cb_exec);
+
+    SvREFCNT_dec(self->cb_num_capture_buff_FETCH);
+    SvREFCNT_dec(self->cb_num_capture_buff_STORE);
+    SvREFCNT_dec(self->cb_num_capture_buff_LENGTH);
+
+    self->rx = NULL;
+    Safefree(self);
+
 /*
     dSP;
     SV * callback;
-    GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
     callback = self->cb_free;
 
