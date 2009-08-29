@@ -77,10 +77,8 @@ typedef struct replug {
     /* The ->stash */
     SV * stash;
 
-    /*
-     * Callbacks
-     */
-
+    /* Callbacks */
+    SV * cb_exec;
     SV * cb_free;
 
     /* ->num_captures */

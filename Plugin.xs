@@ -331,6 +331,14 @@ Plugin_comp(pTHX_ SV * const pattern, U32 flags)
         LEAVE;
     }
 
+    /* If there's an exec callback, store it into the private object so
+     * that it will be the one to be called, even if the engine changes
+     * in between */
+    if (h && h->exec) {
+        re->cb_exec = h->exec;
+	SvREFCNT_inc_simple_void_NN(h->exec);
+    }
+
     /* If any of the comp-time accessors were called we'll have to
      * update the regexp struct with the new info.
      */
@@ -349,11 +357,9 @@ Plugin_exec(pTHX_ REGEXP * const RX, char *stringarg, char *strend,
     dSP;
     I32 matched;
     struct regexp *rx = rxREGEXP(RX);
-    const rep_hint_t *h;
     GET_SELF_FROM_PPRIVATE(rx->pprivate);
 
-    h = rep_hint();
-    if (h && h->exec) {
+    if (self->cb_exec) {
         /* Store the current str for ->str */
         self->str = (SV*)sv;
         SvREFCNT_inc(self->str);
@@ -366,7 +372,7 @@ Plugin_exec(pTHX_ REGEXP * const RX, char *stringarg, char *strend,
         XPUSHs(sv);
         PUTBACK;
 
-        call_sv(h->exec, G_SCALAR);
+        call_sv(self->cb_exec, G_SCALAR);
  
         SPAGAIN;
 

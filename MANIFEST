@@ -28,6 +28,7 @@ t/methods/str/undef.t
 t/num_buff/FETCH.t
 t/num_buff/LENGTH.t
 t/num_buff/STORE.t
+t/scope.t
 t/taint/rx.t
 t/taint/util.t
 t/usage/basic.pm
