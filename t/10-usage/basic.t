@@ -1,5 +1,5 @@
 use strict;
-use lib 't/usage';
+use lib 't/10-usage';
 use Test::More tests => 1;
 
 use basic;

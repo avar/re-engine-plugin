@@ -1,5 +1,5 @@
 use strict;
-use lib 't/usage';
+use lib 't/10-usage';
 use Test::More skip_all => "Needs lameness in user code";
 
 #    my $caller = caller;
