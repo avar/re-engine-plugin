@@ -1,4 +1,4 @@
-use 5.009005;
+use 5.010;
 use ExtUtils::MakeMaker;
 
 my $dist = 're-engine-Plugin';
@@ -29,7 +29,7 @@ WriteMakefile(
     PREREQ_PM        => {
         'XSLoader' => 0,
     },
-    MIN_PERL_VERSION => 5.009005,
+    MIN_PERL_VERSION => 5.010,
     META_MERGE       => \%META,
     dist             => {
         PREOP    => 'pod2text Plugin.pod > $(DISTVNAME)/README',

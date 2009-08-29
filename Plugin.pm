@@ -1,6 +1,6 @@
 # See Plugin.pod for documentation
 package re::engine::Plugin;
-use 5.009005;
+use 5.010;
 use strict;
 
 our ($VERSION, @ISA);
