@@ -185,6 +185,10 @@ called at all.
 The length specified will be used as a a byte length (using
 L<SvPV|perlapi/SvPV>), not a character length.
 
+=head2 nparens
+
+=head2 gofs
+
 =head2 callbacks
 
     # A dumb regexp engine that just tests string equality

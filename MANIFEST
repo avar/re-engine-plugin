@@ -36,4 +36,8 @@ t/50-num_buff/LENGTH.t
 t/50-num_buff/STORE.t
 t/60-taint/rx.t
 t/60-taint/util.t
+t/90-author/kwalitee.t
+t/90-author/portability-files.t
+t/90-author/pod.t
+t/90-author/pod-coverage.t
 typemap
