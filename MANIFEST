@@ -11,10 +11,9 @@ README
 ptable.h
 t/00-compile.t
 t/callbacks/exec.t
-t/eval-comp.t
-t/eval-exec.t
-t/import.t
-t/methods.t
+t/ctl/eval-comp.t
+t/ctl/eval-exec.t
+t/methods/base.t
 t/methods/free.t
 t/methods/minlen/bytes.t
 t/methods/minlen/get.t
@@ -29,11 +28,12 @@ t/methods/str/undef.t
 t/num_buff/FETCH.t
 t/num_buff/LENGTH.t
 t/num_buff/STORE.t
-t/scope.t
 t/taint/rx.t
 t/taint/util.t
 t/usage/basic.pm
 t/usage/basic.t
+t/usage/integrate.t
 t/usage/import.t
 t/usage/import.pm
+t/usage/scope.t
 typemap
