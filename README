@@ -1,6 +1,9 @@
 NAME
     re::engine::Plugin - API to write custom regex engines
 
+VERSION
+    Version 0.08
+
 DESCRIPTION
     As of perl 5.9.5 it's possible to lexically replace perl's built-in
     regular expression engine with your own (see perlreapi and perlpragma).
@@ -113,6 +116,9 @@ CALLBACKS
     routine should return a true value if the match was successful, and a
     false one if it wasn't.
 
+    This callback can also be specified on an individual basis with the
+    "callbacks" method.
+
 METHODS
   str
         "str" ~~ /pattern/;
@@ -166,6 +172,31 @@ METHODS
 
     The length specified will be used as a a byte length (using SvPV), not a
     character length.
+
+  nparens
+  gofs
+  callbacks
+        # A dumb regexp engine that just tests string equality
+        use re::engine::Plugin comp => sub {
+            my ($re) = @_;
+
+            my $pat = $re->pattern;
+
+            $re->callbacks(
+                exec => sub {
+                    my ($re, $str) = @_;
+                    return $pat eq $str;
+                },
+            );
+        };
+
+    Takes a list of key-value pairs of names and subroutines, and replace
+    the callback currently attached to the regular expression for the type
+    given as the key by the code reference passed as the corresponding
+    value.
+
+    The only valid key is currently "exec". See "exec" for more details
+    about this callback.
 
   num_captures
         $re->num_captures(

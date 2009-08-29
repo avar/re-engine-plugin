@@ -1,3 +1,19 @@
+0.08    2009-08-29 16:55 UTC - Vincent Pit
+        + Add : The new ->callbacks method to the regexp object let you specify
+                the 'exec' callback on an individual basis.
+        + Chg : Perl 5.10 is now required (instead of 5.9.5).
+        + Fix : The pragma was leaking into required scopes on 5.10.0.
+        + Fix : If you specified a different re::engine::Plugin between the
+                compilation and the execution of a regular expression, the
+                'exec' callback invoked used to be the one for the second
+                engine. Worse, if the original engine wasn't in scope at the
+                time of execution, nothing happened. This is now fixed.
+        + Fix : The reference count of the callbacks stored wasn't properly
+                decremented.
+        + Fix : Incomplete MANIFEST.
+        + Tst : Subdirectories are now ordered.
+        + Tst : Author tests.
+
 0.07    2009-08-23 09:30 UTC - Vincent Pit
         + Fix : [perl #38684]: test failures in t/method/mod.t
         + Fix : Building with blead.
