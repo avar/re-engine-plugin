@@ -122,6 +122,9 @@ available as the second argument (C<$str>) and through the L<str|/str>
 method. The routine should return a true value if the match was
 successful, and a false one if it wasn't.
 
+This callback can also be specified on an individual basis with the
+L</callbacks> method.
+
 =head1 METHODS
 
 =head2 str
@@ -181,6 +184,29 @@ called at all.
 
 The length specified will be used as a a byte length (using
 L<SvPV|perlapi/SvPV>), not a character length.
+
+=head2 callbacks
+
+    # A dumb regexp engine that just tests string equality
+    use re::engine::Plugin comp => sub {
+        my ($re) = @_;
+
+        my $pat = $re->pattern;
+
+        $re->callbacks(
+            exec => sub {
+                my ($re, $str) = @_;
+                return $pat eq $str;
+            },
+        );
+    };
+
+Takes a list of key-value pairs of names and subroutines, and replace the
+callback currently attached to the regular expression for the type given as
+the key by the code reference passed as the corresponding value.
+
+The only valid key is currently C<exec>. See L</exec> for more details about
+this callback.
 
 =head2 num_captures
 

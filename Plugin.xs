@@ -769,6 +769,15 @@ PPCODE:
     }
 
 void
+_exec(re::engine::Plugin self, ...)
+PPCODE:
+    if (items > 1) {
+        SvREFCNT_dec(self->cb_exec);
+        self->cb_exec = ST(1);
+        SvREFCNT_inc(self->cb_exec);
+    }
+
+void
 _num_capture_buff_FETCH(re::engine::Plugin self, ...)
 PPCODE:
     if (items > 1) {

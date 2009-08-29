@@ -51,6 +51,19 @@ sub unimport
     return;
 }
 
+sub callbacks
+{
+    my ($re, %callback) = @_;
+
+    my %map = map { $_ => "_$_" } qw/exec/;
+
+    for my $key (keys %callback) {
+        my $name = $map{$key};
+        next unless defined $name;
+        $re->$name($callback{$key});
+    }
+}
+
 sub num_captures
 {
     my ($re, %callback) = @_;
