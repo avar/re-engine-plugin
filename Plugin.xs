@@ -58,10 +58,10 @@
 /* ... Thread-safe hints ................................................... */
 
 typedef struct {
- SV  *comp;
- SV  *exec;
+ SV *comp;
+ SV *exec;
 #if REP_WORKAROUND_REQUIRE_PROPAGATION
- I32  requires;
+ IV  cxreq;
 #endif
 } rep_hint_t;
 
@@ -124,13 +124,13 @@ STATIC void rep_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
  if (ud->owner == aTHX)
   return;
 
- h2           = PerlMemShared_malloc(sizeof *h2);
- h2->comp     = rep_clone(h1->comp, ud->owner);
+ h2        = PerlMemShared_malloc(sizeof *h2);
+ h2->comp  = rep_clone(h1->comp, ud->owner);
  SvREFCNT_inc(h2->comp);
- h2->exec     = rep_clone(h1->exec, ud->owner);
+ h2->exec  = rep_clone(h1->exec, ud->owner);
  SvREFCNT_inc(h2->exec);
 #if REP_WORKAROUND_REQUIRE_PROPAGATION
- h2->requires = h1->requires;
+ h2->cxreq = h1->cxreq;
 #endif
 
  ptable_store(ud->tbl, ent->key, h2);
@@ -166,35 +166,37 @@ STATIC SV *rep_validate_callback(SV *code) {
  return SvREFCNT_inc_simple_NN(code);
 }
 
+#if REP_WORKAROUND_REQUIRE_PROPAGATION
+STATIC IV rep_require_tag(pTHX) {
+#define rep_require_tag() rep_require_tag(aTHX)
+ const PERL_SI *si;
+
+ for (si = PL_curstackinfo; si; si = si->si_prev) {
+  I32 cxix;
+
+  for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+   const PERL_CONTEXT *cx = si->si_cxstack + cxix;
+
+   if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
+    return PTR2IV(cx);
+  }
+ }
+
+ return PTR2IV(NULL);
+}
+#endif /* REP_WORKAROUND_REQUIRE_PROPAGATION */
+
 STATIC SV *rep_tag(pTHX_ SV *comp, SV *exec) {
 #define rep_tag(C, E) rep_tag(aTHX_ (C), (E))
  rep_hint_t *h;
  dMY_CXT;
 
  h = PerlMemShared_malloc(sizeof *h);
-
- h->comp = rep_validate_callback(comp);
- h->exec = rep_validate_callback(exec);
-
+ h->comp  = rep_validate_callback(comp);
+ h->exec  = rep_validate_callback(exec);
 #if REP_WORKAROUND_REQUIRE_PROPAGATION
- {
-  const PERL_SI *si;
-  I32            requires = 0;
-
-  for (si = PL_curstackinfo; si; si = si->si_prev) {
-   I32 cxix;
-
-   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
-
-    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
-     ++requires;
-   }
-  }
-
-  h->requires = requires;
- }
-#endif
+ h->cxreq = rep_require_tag();
+#endif /* REP_WORKAROUND_REQUIRE_PROPAGATION */
 
 #if REP_THREADSAFE
  /* We only need for the key to be an unique tag for looking up the value later.
@@ -220,23 +222,9 @@ STATIC const rep_hint_t *rep_detag(pTHX_ const SV *hint) {
 #endif /* REP_THREADSAFE */
 
 #if REP_WORKAROUND_REQUIRE_PROPAGATION
- {
-  const PERL_SI *si;
-  I32            requires = 0;
-
-  for (si = PL_curstackinfo; si; si = si->si_prev) {
-   I32 cxix;
-
-   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
-
-    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE
-                               && ++requires > h->requires)
-     return NULL;
-   }
-  }
- }
-#endif
+ if (rep_require_tag() != h->cxreq)
+  return NULL;
+#endif /* REP_WORKAROUND_REQUIRE_PROPAGATION */
 
  return h;
 }
