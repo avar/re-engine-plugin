@@ -1,4 +1,7 @@
 use 5.010;
+
+use strict;
+use warnings;
 use ExtUtils::MakeMaker;
 
 my $dist = 're-engine-Plugin';
