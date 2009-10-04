@@ -3,6 +3,8 @@ use ExtUtils::MakeMaker;
 
 my $dist = 're-engine-Plugin';
 
+(my $name = $dist) =~ s{-}{::}g;
+
 my %PREREQ_PM = (
  'XSLoader' => 0,
 );
@@ -26,7 +28,7 @@ my %META = (
 );
 
 WriteMakefile(
-    NAME             => 're::engine::Plugin',
+    NAME             => $name,
     AUTHOR           => 'Vincent Pit <perl@profvince.com>',
     LICENSE          => 'perl',
     ABSTRACT_FROM    => 'Plugin.pod',
