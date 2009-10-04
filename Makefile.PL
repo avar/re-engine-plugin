@@ -11,6 +11,7 @@ my %META = (
   'ExtUtils::MakeMaker' => 0,
   'Test::More'          => 0,
  },
+ dynamic_config => 0,
  resources => {
   bugtracker => "http://rt.cpan.org/NoAuth/ReportBug.html?Queue=$dist",
   homepage   => "http://search.cpan.org/dist/$dist/",
