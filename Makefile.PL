@@ -3,6 +3,10 @@ use ExtUtils::MakeMaker;
 
 my $dist = 're-engine-Plugin';
 
+my %PREREQ_PM = (
+ 'XSLoader' => 0,
+);
+
 my %META = (
  configure_requires => {
   'ExtUtils::MakeMaker' => 0,
@@ -10,6 +14,7 @@ my %META = (
  build_requires => {
   'ExtUtils::MakeMaker' => 0,
   'Test::More'          => 0,
+  %PREREQ_PM,
  },
  dynamic_config => 0,
  resources => {
@@ -27,9 +32,7 @@ WriteMakefile(
     ABSTRACT_FROM    => 'Plugin.pod',
     VERSION_FROM     => 'Plugin.pm',
     PL_FILES         => {},
-    PREREQ_PM        => {
-        'XSLoader' => 0,
-    },
+    PREREQ_PM        => \%PREREQ_PM,
     MIN_PERL_VERSION => 5.010,
     META_MERGE       => \%META,
     dist             => {
