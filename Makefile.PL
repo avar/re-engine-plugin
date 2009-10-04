@@ -31,23 +31,23 @@ my %META = (
 );
 
 WriteMakefile(
-    NAME             => $name,
-    AUTHOR           => 'Vincent Pit <perl@profvince.com>',
-    LICENSE          => 'perl',
-    ABSTRACT_FROM    => 'Plugin.pod',
-    VERSION_FROM     => 'Plugin.pm',
-    PL_FILES         => {},
-    PREREQ_PM        => \%PREREQ_PM,
-    MIN_PERL_VERSION => 5.010,
-    META_MERGE       => \%META,
-    dist             => {
-        PREOP    => 'pod2text Plugin.pod > $(DISTVNAME)/README',
-        COMPRESS => 'gzip -9f', SUFFIX => 'gz'
-    },
-    clean            => {
-        FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
-    },
-    test             => {
-        TESTS => 't/*.t t/*/*.t t/*/*/*.t',
-    },
+ NAME             => $name,
+ AUTHOR           => 'Vincent Pit <perl@profvince.com>',
+ LICENSE          => 'perl',
+ ABSTRACT_FROM    => 'Plugin.pod',
+ VERSION_FROM     => 'Plugin.pm',
+ PL_FILES         => {},
+ PREREQ_PM        => \%PREREQ_PM,
+ MIN_PERL_VERSION => 5.010,
+ META_MERGE       => \%META,
+ dist             => {
+  PREOP    => 'pod2text Plugin.pod > $(DISTVNAME)/README',
+  COMPRESS => 'gzip -9f', SUFFIX => 'gz'
+ },
+ clean            => {
+  FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
+ },
+ test             => {
+  TESTS => 't/*.t t/*/*.t t/*/*/*.t',
+ },
 );
