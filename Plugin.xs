@@ -11,6 +11,14 @@
 #define __PACKAGE__     "re::engine::Plugin"
 #define __PACKAGE_LEN__ (sizeof(__PACKAGE__)-1)
 
+#ifndef ENTER_with_name
+# define ENTER_with_name(N) ENTER
+#endif
+
+#ifndef LEAVE_with_name
+# define LEAVE_with_name(N) LEAVE
+#endif
+
 #define REP_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
 
 #ifndef REP_WORKAROUND_REQUIRE_PROPAGATION
@@ -656,6 +664,13 @@ CODE:
 	MY_CXT_CLONE;
 	MY_CXT.tbl   = t;
 	MY_CXT.owner = aTHX;
+    }
+    {
+	level = PerlMemShared_malloc(sizeof *level);
+	*level = 1;
+	LEAVE_with_name("sub");
+	SAVEDESTRUCTOR_X(rep_thread_cleanup, level);
+	ENTER_with_name("sub");
     }
 
 #endif
